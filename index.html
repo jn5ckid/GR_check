@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>그린리모델링 인재양성 플랫폼 · 교과 이수 점검</title>
+<meta name="description" content="보관성적증명서를 읽어 GR 특성화 교과 24학점 이수 가능 여부를 점검합니다">
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<style>
+  :root{
+    --paper:#FFFFFF; --ink:#1B1C17; --ink-soft:#666A5D; --ink-faint:#93968A;
+    --line:#DEDEDA; --line-soft:#EDEDEA;
+    --pine:#087263; --pine-dim:#065A4F; --pine-wash:#F0F6F4;
+    --flag:#9A5B00; --flag-wash:#FBF5EC;
+    --arch:#A4413C; --common:#C07A28; --eng:#2E5E96; --field:#2F6B4F;
+    --mono: ui-monospace,'SF Mono','Menlo','Consolas',monospace;
+  }
+  *{box-sizing:border-box;}
+  html{-webkit-text-size-adjust:100%;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-size:15px;line-height:1.6;
+       font-family:'Pretendard Variable','Pretendard',-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-serif;
+       -webkit-font-smoothing:antialiased;}
+  a{color:var(--pine);}
+  .wrap{max-width:640px;margin:0 auto;padding:0 20px 80px;}
+  :focus-visible{outline:2px solid var(--pine);outline-offset:2px;border-radius:3px;}
+
+  header{padding:38px 20px 0;}
+  .header-inner{max-width:640px;margin:0 auto;}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;color:var(--ink-faint);margin-bottom:14px;}
+  h1.title{font-weight:800;font-size:23px;line-height:1.4;letter-spacing:-.01em;margin:0 0 10px;}
+  h1.title .accent{color:var(--pine);}
+  .lede{font-size:14px;color:var(--ink-soft);margin:0 0 22px;max-width:46em;}
+
+  /* status */
+  .status{position:sticky;top:0;z-index:10;background:var(--paper);padding:14px 0 12px;border-bottom:1px solid var(--line);}
+  .gauge{border:1.3px solid var(--line);border-radius:8px;padding:10px 13px 12px;}
+  .gauge.met{border-color:var(--pine);}
+  .gtop{display:flex;align-items:baseline;justify-content:space-between;gap:10px;}
+  .gtop .glabel{font-size:11.5px;color:var(--ink-faint);}
+  .gtop .gstage{font-size:12px;font-weight:700;color:var(--ink-faint);font-family:var(--mono);}
+  .gauge.met .gstage{color:var(--pine-dim);}
+  .gval{font-family:var(--mono);font-size:22px;font-weight:600;letter-spacing:-.02em;line-height:1.2;margin-top:1px;}
+  .gval .goal{font-size:14px;color:var(--ink-faint);font-weight:400;}
+  .gauge.met .gval{color:var(--pine-dim);}
+  .bar{height:4px;background:var(--line-soft);border-radius:2px;margin-top:8px;overflow:hidden;display:flex;}
+  .bar i{display:block;height:100%;width:0;transition:width .2s ease;}
+  .bar i.done{background:var(--pine);}
+  .bar i.plan{background:#9CC8BE;}
+  .gsub{display:flex;gap:14px;margin-top:8px;font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);flex-wrap:wrap;}
+  .gsub b{font-weight:600;color:var(--ink-soft);}
+  .status.compact{padding:8px 0;}
+  .status.compact .gval{font-size:16px;}
+  .status.compact .bar{margin-top:6px;}
+  .status.compact .gsub{display:none;}
+  section{margin-top:34px;scroll-margin-top:130px;}
+
+  /* verdict */
+  .verdict{border:1.3px solid var(--line);border-radius:9px;padding:14px 15px 15px;margin:18px 0 4px;}
+  .verdict.ok{border-color:var(--pine);background:var(--pine-wash);}
+  .verdict.no{border-color:var(--flag);background:var(--flag-wash);}
+  .verdict h2{font-size:15px;font-weight:700;margin:0 0 8px;}
+  .verdict.ok h2{color:var(--pine-dim);}
+  .verdict.no h2{color:var(--flag);}
+  .verdict ul{margin:0;padding-left:17px;}
+  .verdict li{font-size:13.5px;color:var(--ink-soft);margin-bottom:3px;line-height:1.55;}
+  .verdict li b{color:var(--ink);font-weight:600;}
+  .verdict .note{font-size:12.5px;color:var(--ink-faint);margin:10px 0 0;padding-top:9px;border-top:1px solid var(--line);line-height:1.6;}
+  .verdict.ok .note{border-top-color:#CBE0DA;}
+  .verdict.no .note{border-top-color:#EFE3D2;}
+
+  h2.sec{font-size:16px;font-weight:700;margin:0 0 4px;display:flex;align-items:baseline;gap:8px;}
+  h2.sec .req{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--ink-faint);}
+  .sec-note{font-size:13px;color:var(--ink-soft);margin:0 0 14px;}
+
+  /* import */
+  .drop{display:flex;flex-direction:column;align-items:center;gap:5px;border:1.3px dashed var(--line);
+        border-radius:9px;padding:24px 18px;cursor:pointer;text-align:center;
+        transition:border-color .15s ease,background .15s ease;}
+  .drop:hover,.drop.over{border-color:var(--pine);background:var(--pine-wash);}
+  .drop .dmain{font-size:14px;font-weight:600;}
+  .drop .dsub{font-size:12.5px;color:var(--ink-faint);}
+  .drop.busy{pointer-events:none;opacity:.6;}
+  .paste{margin-top:12px;}
+  .paste summary{font-size:13px;color:var(--ink-faint);cursor:pointer;padding:4px 0;}
+  .paste summary:hover{color:var(--ink);}
+  .paste textarea{width:100%;min-height:118px;margin-top:6px;padding:10px 12px;border:1.3px solid var(--line);
+                  border-radius:8px;font-family:var(--mono);font-size:12.5px;line-height:1.75;resize:vertical;
+                  color:var(--ink);background:#fff;}
+  .paste textarea:focus{outline:none;border-color:var(--pine);}
+  .paste .prun{margin-top:8px;border:1.3px solid var(--line);background:#fff;border-radius:7px;
+               padding:7px 15px;font-family:inherit;font-size:13px;cursor:pointer;color:var(--ink);}
+  .paste .prun:hover{border-color:var(--pine);color:var(--pine-dim);}
+  .srcnote{border:1.3px solid var(--flag);background:var(--flag-wash);border-radius:8px;
+           padding:11px 13px;margin-top:14px;font-size:13px;color:var(--ink-soft);line-height:1.6;}
+  .srcnote b{color:var(--flag);font-weight:700;}
+  .rowtab{border:1.3px solid var(--line);border-radius:8px;overflow:hidden;margin-top:8px;}
+  .rrow{display:flex;align-items:center;gap:9px;padding:6px 10px;
+        border-bottom:1px solid var(--line-soft);font-size:13px;}
+  .rrow:last-child{border-bottom:none;}
+  .rrow.on{background:var(--pine-wash);}
+  .rrow.fail{opacity:.45;}
+  .rrow.dup{opacity:.55;}
+  .rrow .rn em.dupe{color:var(--flag);background:var(--flag-wash);}
+  .rrow .rt{font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);width:60px;flex-shrink:0;}
+  .rrow .rn{flex:1;line-height:1.4;min-width:0;}
+  .rrow .rn em{font-style:normal;font-family:var(--mono);font-size:10.5px;color:var(--pine-dim);
+               background:var(--pine-wash);padding:1px 5px;border-radius:4px;margin-left:5px;}
+  .rrow .rc{font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);flex-shrink:0;}
+  .rrow .rx{font-family:var(--mono);font-size:11px;color:var(--ink-faint);flex-shrink:0;width:150px;text-align:right;}
+  .rsel{font-family:inherit;font-size:12px;padding:3px 6px;border:1.3px solid var(--line);
+        border-radius:6px;background:#fff;color:var(--ink-faint);width:150px;flex-shrink:0;}
+  .rsel:focus{outline:none;border-color:var(--pine);}
+  .rrow.on .rsel{border-color:var(--pine);color:var(--pine-dim);font-weight:600;}
+  @media (max-width:560px){
+    .rrow{flex-wrap:wrap;}
+    .rrow .rn{flex:1 1 100%;order:-1;}
+    .rsel,.rrow .rx{width:auto;flex:1;}
+  }
+  .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px;}
+  .summary div{border:1.3px solid var(--line);border-radius:7px;padding:7px 9px 9px;}
+  .summary .k{font-size:11px;color:var(--ink-faint);line-height:1.35;}
+  .summary .v{font-family:var(--mono);font-size:17px;font-weight:600;margin-top:1px;}
+  .summary .v.flagv{color:var(--flag);}
+
+  .field{margin-top:18px;}
+  .fhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding-bottom:5px;
+         border-bottom:1px solid var(--line);margin-bottom:8px;}
+  .fhead .fname{font-size:12.5px;font-weight:600;color:var(--ink-soft);}
+  .fhead .fval{font-family:var(--mono);font-size:12px;color:var(--ink-faint);}
+  .chips{display:flex;flex-wrap:wrap;gap:5px;}
+  .chip{font-family:var(--mono);font-size:12px;border:1.3px solid var(--line);border-radius:6px;
+        padding:4px 9px;background:#fff;cursor:pointer;color:var(--ink-soft);font-weight:500;}
+  .chip:hover{border-color:var(--pine);}
+  .chip.on{border-color:var(--pine);background:var(--pine-wash);color:var(--pine-dim);}
+  .chip .n{color:var(--ink-faint);font-size:10.5px;margin-left:4px;}
+  .chip.on .n{color:var(--pine);}
+  .chip.plain{font-family:inherit;font-size:13px;padding:5px 12px;}
+  .hint{font-size:12.5px;color:var(--ink-faint);margin-top:7px;line-height:1.55;}
+
+  .maybe{border:1.3px solid var(--flag);background:var(--flag-wash);border-radius:8px;padding:12px 13px;margin-top:16px;}
+  .maybe h3{font-size:13.5px;font-weight:700;margin:0 0 3px;color:var(--flag);}
+  .maybe p{font-size:12.5px;color:var(--ink-soft);margin:0 0 9px;line-height:1.55;}
+  .mrow{display:flex;align-items:center;gap:9px;padding:6px 0;border-top:1px solid #EFE3D2;}
+  .mrow .mn{flex:1;font-size:13.5px;line-height:1.4;}
+  .mrow .mn em{font-style:normal;color:var(--ink-faint);font-size:12px;}
+  .mrow button{border:1.3px solid var(--line);background:#fff;border-radius:6px;padding:3px 9px;
+               font-family:inherit;font-size:12.5px;cursor:pointer;color:var(--ink-soft);flex-shrink:0;}
+  .mrow button:hover{border-color:var(--pine);color:var(--pine);}
+  .mrow button.done{border-color:var(--pine);background:var(--pine-wash);color:var(--pine-dim);}
+  details.rest{margin-top:14px;}
+  details.rest summary{font-size:13px;color:var(--ink-faint);cursor:pointer;padding:4px 0;}
+  details.rest summary:hover{color:var(--ink);}
+  .restlist{font-family:var(--mono);font-size:12px;color:var(--ink-faint);line-height:1.9;padding-top:4px;}
+
+  /* tally */
+  .tally{border:1.3px solid var(--line);border-radius:8px;overflow:hidden;}
+  .trow{display:flex;align-items:baseline;gap:10px;padding:9px 13px;border-bottom:1px solid var(--line-soft);}
+  .trow:last-child{border-bottom:none;}
+  .trow .tk{flex:1;font-size:13.5px;}
+  .trow .tk em{font-style:normal;color:var(--ink-faint);font-size:12px;display:block;line-height:1.5;margin-top:1px;}
+  .trow .tv{font-family:var(--mono);font-size:14px;font-weight:600;flex-shrink:0;}
+  .trow.sum{background:#F7F7F5;}
+  .trow.dim .tk,.trow.dim .tv{color:var(--ink-faint);}
+  .routes{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;}
+  .route{border:1.3px solid var(--line);border-radius:8px;padding:10px 12px 12px;}
+  .route.on{border-color:var(--pine);background:var(--pine-wash);}
+  .route .rname{font-size:12.5px;font-weight:700;}
+  .route.on .rname{color:var(--pine-dim);}
+  .route .rbody{font-family:var(--mono);font-size:12px;color:var(--ink-soft);margin-top:4px;line-height:1.6;}
+
+  /* path */
+  .term-block{margin-bottom:20px;}
+  .term-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+             padding-bottom:5px;border-bottom:1px solid var(--line);margin-bottom:4px;}
+  .term-head .tname{font-size:13px;font-weight:700;}
+  .term-head .tmeta{font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);}
+  .cw{display:flex;align-items:center;gap:10px;padding:7px 2px 7px 11px;border-bottom:1px solid var(--line-soft);
+      border-left:3px solid var(--line);cursor:pointer;}
+  .cw:last-child{border-bottom:none;}
+  .cw.tr-arch{border-left-color:var(--arch);}
+  .cw.tr-common{border-left-color:var(--common);}
+  .cw.tr-eng{border-left-color:var(--eng);}
+  .cw.tr-field{border-left-color:var(--field);}
+  .cw .cn{flex:1;font-size:14px;line-height:1.4;}
+  .cw .cm{font-family:var(--mono);font-size:11px;color:var(--ink-faint);line-height:1.5;display:block;margin-top:1px;}
+  .cw .cs{font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:5px;flex-shrink:0;
+          background:#F4F4F1;color:var(--ink-faint);}
+  .cw.done .cs{background:var(--pine);color:#fff;}
+  .cw.done .cn{font-weight:600;}
+  .cw.planned{background:var(--pine-wash);}
+  .cw.planned .cs{background:var(--pine-wash);color:var(--pine-dim);border:1px solid var(--pine);}
+  .cw.planned .cn{font-weight:600;color:var(--pine-dim);}
+  .cw.locked{cursor:default;opacity:.45;}
+  .cw.locked .cn{font-weight:400;}
+  .cw.warn .cs{background:var(--flag-wash);color:var(--flag);}
+  .mark{font-family:var(--mono);font-size:10.5px;color:var(--flag);margin-left:4px;}
+  .legend{display:flex;flex-wrap:wrap;gap:12px;font-size:11.5px;color:var(--ink-faint);margin-bottom:14px;}
+  .legend span{display:flex;align-items:center;gap:5px;}
+  .legend i{width:9px;height:9px;border-radius:2px;display:block;}
+                padding:6px 11px;cursor:pointer;color:var(--ink-soft);}
+  .gate{display:flex;gap:8px;font-size:13px;padding:9px 11px;border-radius:7px;background:#F7F7F5;
+        color:var(--ink-soft);margin-top:10px;line-height:1.5;}
+  .gate.met{background:var(--pine-wash);color:var(--pine-dim);}
+  .gate .gm{font-family:var(--mono);flex-shrink:0;}
+  .empty{font-size:13px;color:var(--ink-faint);padding:16px 0;text-align:center;}
+
+  /* review */
+  .review-toggle{margin-top:40px;width:100%;border:1.3px solid var(--line);background:#fff;border-radius:8px;
+                 padding:11px 14px;font-family:inherit;font-size:14px;font-weight:600;color:var(--ink);cursor:pointer;
+                 display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;}
+  .review-toggle:hover{border-color:var(--pine);}
+  .review-toggle .n{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--pine-dim);
+                    background:var(--pine-wash);padding:2px 7px;border-radius:5px;flex-shrink:0;}
+  .review{display:none;margin-top:14px;}
+  .review.open{display:block;}
+  .item{border-left:2px solid var(--line);padding-left:13px;margin-bottom:20px;}
+  .item.flag{border-left-color:var(--flag);}
+  .item.done{border-left-color:var(--pine);}
+  .item h3{font-size:14px;font-weight:700;margin:0 0 5px;line-height:1.45;}
+  .item p{font-size:13.5px;color:var(--ink-soft);margin:0 0 6px;line-height:1.6;}
+  .item .src{font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);line-height:1.7;}
+  .item .applied{font-size:13px;color:var(--pine-dim);background:var(--pine-wash);padding:7px 10px;border-radius:6px;margin:8px 0 0;}
+
+  footer{margin-top:52px;padding-top:22px;border-top:1px solid var(--line);}
+  footer p{font-size:13px;color:var(--ink-soft);line-height:1.75;margin:0 0 12px;}
+  footer .meta{font-family:var(--mono);font-size:11px;color:var(--ink-faint);letter-spacing:.05em;}
+  .reset{margin-top:24px;border:none;background:none;font-family:inherit;font-size:13px;color:var(--ink-faint);
+         cursor:pointer;padding:4px 0;text-decoration:underline;text-underline-offset:3px;}
+  .reset:hover{color:var(--ink);}
+
+  @media (max-width:470px){
+    .summary{grid-template-columns:repeat(2,1fr);}
+    .routes{grid-template-columns:1fr;}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none !important;}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="eyebrow">국토교통부 · 국토안전관리원 국고보조사업 / 2026–2028</div>
+    <h1 class="title">그린리모델링 인재양성 플랫폼<br><span class="accent">교과 이수 점검</span></h1>
+    <p class="lede">보관성적증명서를 올리고 전공과 참여 시작 학기를 지정하면, 교과 24학점 요건을 채울 수 있는지와 어떤 과목이 남아 있는지를 계산합니다.</p>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="status">
+    <div class="gauge" id="gauge">
+      <div class="gtop"><span class="glabel">교과 인정 학점</span><span class="gstage" id="gstage">GR기초 0 · GR심화 0</span></div>
+      <div class="gval"><span id="gval">0</span><span class="goal"> / 24</span></div>
+      <div class="bar"><i class="done" id="barDone"></i><i class="plan" id="barPlan"></i></div>
+      <div class="gsub">
+        <span>이수 <b id="sDone">0</b></span>
+        <span>수강 예정 <b id="sPlan">0</b></span>
+        <span>남은 필요 <b id="sNeed">24</b></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="verdict" id="verdict"></div>
+
+  <section>
+    <h2 class="sec">보관성적증명서 불러오기 <span class="req">PDF</span></h2>
+    <p class="sec-note">보관성적증명서 PDF를 올려주세요. 파일은 브라우저 안에서만 읽으며 어디에도 전송하거나 저장하지 않습니다. 년도 · 학기 · 과목 · 학점만 사용합니다.</p>
+    <label class="drop" id="drop">
+      <input type="file" accept="application/pdf,.pdf" id="file" hidden>
+      <span class="dmain">PDF 파일 선택</span>
+      <span class="dsub">또는 여기로 끌어놓기</span>
+    </label>
+    <details class="paste" id="pasteBox">
+      <summary>PDF가 읽히지 않으면 표를 직접 붙여넣기</summary>
+      <p class="hint">성적 조회 화면에서 표를 드래그해 복사한 뒤 붙여넣으세요. 열 순서만 같으면 줄이 어긋나도 인식합니다. 머리글이나 다른 안내 문구가 섞여도 됩니다.</p>
+      <textarea id="pasteArea" spellcheck="false" placeholder="2023 1 전공 29131-01 건축재료및구조실험 3 A+ 4.5&#10;2023 2 전공필수 42753-01 건축공학설계(1) 3 B+ 3.5"></textarea>
+      <button type="button" class="prun" id="pasteRun">읽기</button>
+    </details>
+    <div id="importResult"></div>
+  </section>
+
+  <section id="secTally">
+    <h2 class="sec">이수 현황 <span class="req">GR기초 ≤9 + GR심화 ≥15</span></h2>
+    <p class="sec-note">GR기초 교과목은 최대 9학점까지 인정되고, 그중 참여 전 이수분은 6학점까지만 소급됩니다. GR심화 교과목은 소급되지 않으므로 참여 전 이수분은 인정에서 빠집니다.</p>
+    <div class="tally" id="tally"></div>
+    <div class="routes" id="routes"></div>
+    <div class="gate" id="gateMust"></div>
+  </section>
+
+  <section id="secPath">
+    <h2 class="sec">이수 경로 <span class="req">이수체계도 기준</span></h2>
+    <p class="sec-note">남은 학기에 열리는 특성화 교과목입니다. 누르면 수강 예정으로 담기고 상단 학점에 반영됩니다. 1~2학년 공통 GR기초는 전부 참여 전 이수분이므로 소급 계산에만 들어갑니다.</p>
+    <div class="legend">
+      <span><i style="background:var(--arch)"></i>건축학 전공</span>
+      <span><i style="background:var(--common)"></i>공통</span>
+      <span><i style="background:var(--eng)"></i>건축공학 전공</span>
+      <span>★ 신설</span><span>◆ 특성화 필수</span>
+    </div>
+    <div id="path"></div>
+  </section>
+
+  <button class="reset" id="reset">입력 초기화</button>
+
+  <button class="review-toggle" id="reviewToggle" aria-expanded="false" aria-controls="review">
+    <span>적용 기준 — 확정 사항과 남은 논의</span>
+    <span class="n" id="flagCount"></span>
+  </button>
+  <div class="review" id="review"></div>
+
+  <footer>
+    <p>이 도구는 교과 영역만 다룹니다. Silver 이상에 필요한 비교과 15크레딧과 Gold의 현장실습 4주 요건은 포함되지 않습니다.</p>
+    <p>최신 이수체계도와 사업단 확정 기준으로 작성했습니다. 판독 결과는 참고값이며 실제 이수 판정은 학사정보시스템 기록을 기준으로 사업단이 확정합니다.</p>
+    <p>문의: 사업책임 김영수 교수(HIBEL) · 실무책임 박상욱 교수(SHEAR LAB) · 사업단 운영실</p>
+    <div class="meta">LAST UPDATED 2026.09.10</div>
+  </footer>
+
+</div>
+
+<script>
+/* ============================================================
+   1. 이수체계도 — 교과목 원장
+   track: arch 건축학 · common 공통 · eng 건축공학
+   ============================================================ */
+const C = function(n, track, term, req, gr, cr, o){
+  const x = {n:n, track:track, term:term, req:req, gr:gr, cr:cr};
+  for(const k in (o || {})) x[k] = o[k];
+  return x;
+};
+const COURSES = [
+  /* 공통 · GR기초 */
+  C('건축기초설계1','common','1-1','전공필수','기초',3),
+  C('건축의이해','common','1-1','전공필수','기초',3),
+  C('건축기초설계2','common','1-2','전공필수','기초',4),
+  C('공학전산기초','common','1-2','전공필수','기초',3),
+  C('건축설계(1)','common','2-1','전공필수','기초',4,{alias:['건축설계1']}),
+  C('건축환경및설비','common','2-1','전공필수','기초',3,{alias:['건축환경 및 설비']}),
+  C('건축구조역학','common','2-1','전공필수','기초',3),
+  C('건축설계(2)','common','2-2','전공필수','기초',4,{alias:['건축설계2']}),
+  C('건축재료및시공','common','2-2','전공필수','기초',3),
+  C('도시공간론','common','2-2','전공필수','기초',3),
+  C('디지털건축2','common','3-1','전공선택','기초',3),
+  /* 공통 · GR심화 */
+  C('구조시스템설계','common','3-2','전공필수','심화',3,{reqOf:'arch'}),
+  C('BIM시스템공학','common','3-2','전공필수','심화',3,{reqOf:'eng', alias:['BIM 시스템공학']}),
+  C('제로에미션건축','common','4-1','전공선택','심화',3),
+  C('그린리모델링','common','4-1','전공선택','심화',3,{star:true, must:true}),
+  /* 건축학 · GR심화 */
+  C('친환경건축계획','arch','3-2','전공필수','심화',3),
+  C('건축설계(5)','arch','4-1','전공필수','심화',6,{alias:['건축설계5']}),
+  /* 건축공학 · GR기초 */
+  C('철근콘크리트구조설계','eng','3-1','전공필수','기초',3),
+  C('건축시공기술','eng','3-1','전공선택','기초',3),
+  C('부정정구조해석','eng','3-2','전공선택','기초',3),
+  C('강구조설계','eng','3-2','전공선택','기초',3),
+  /* 건축공학 · GR심화 */
+  C('공기조화설비','eng','3-1','전공필수','심화',3),
+  C('친환경설비설계','eng','3-2','전공선택','심화',3),
+  C('건축시스템설계','eng','4-1','전공필수','심화',3,
+    {must:true, note:'탄소중립 관련 주제 수행 시 검토 후 반영', alias:['건축시스템설계(환경·설비)']}),
+  C('건축재료및구조실험','eng','4-1','전공선택','심화',3),
+  C('건물성능분석','eng','4-1','전공선택','심화',3,{star:true, alias:['건물에너지분석']}),
+  C('건축연구','eng','4-2','전공필수','심화',3,
+    {note:'탄소중립 관련 주제 수행 시 검토 후 반영', alias:['건축연구(환경·설비)']}),
+  C('건설관리의 이해','eng','4-2','전공필수','심화',3,{alias:['건설관리의이해']})
+];
+
+const TERMS = ['3-1','3-2','4-1','4-2'];
+const TERM_LABEL = {'3-1':'3학년 1학기','3-2':'3학년 2학기','4-1':'4학년 1학기','4-2':'4학년 2학기'};
+
+/* 매칭 색인 */
+const NORM = function(s){
+  return String(s)
+    .replace(/\(([^)]*)\)/g, function(m, inner){
+      const t = inner.replace(/\s/g,'');
+      return /^\d+$/.test(t) ? t : '';
+    })
+    .replace(/[Ⅰ]/g,'1').replace(/[Ⅱ]/g,'2').replace(/[Ⅲ]/g,'3').replace(/[Ⅳ]/g,'4').replace(/[Ⅴ]/g,'5')
+    .replace(/[^0-9A-Za-z가-힣]/g,'').toUpperCase();
+};
+const INDEX = [];
+COURSES.forEach(function(c){
+  INDEX.push({key:NORM(c.n), c:c});
+  (c.alias || []).forEach(function(a){ INDEX.push({key:NORM(a), c:c}); });
+});
+function byName(n){ for(let i=0;i<COURSES.length;i++) if(COURSES[i].n === n) return COURSES[i]; return null; }
+
+/* ============================================================
+   2. 상태
+   ============================================================ */
+const state = {
+  rows:[], terms:[], startTerm:null, offset:null, curNom:null,
+  done:{},    // 과목명 → {term, before}
+  plan:{},    // 과목명 → true
+  source:null, manual:{}, dup:{}
+};
+
+/* ============================================================
+   3. PDF 판독
+   ============================================================ */
+const GRADE = /^(A\+|A0|A|B\+|B0|B|C\+|C0|C|D\+|D0|D|F|P|NP|S|U|W|I)$/;
+const FAIL  = /^(F|NP|U|W|I)$/;
+const SEMRANK = {'1':1,'여름':1.5,'하계':1.5,'계절':1.5,'2':2,'겨울':2.5,'동계':2.5};
+function semRank(s){ const v = SEMRANK[s]; if(v !== undefined) return v; const n = parseFloat(s); return isNaN(n) ? 9 : n; }
+function nomIdx(term){ const p = term.split('-'); return (+p[0] - 1) * 2 + (+p[1] - 1); }
+function absIdx(year, sem){ return year * 2 + (semRank(sem) >= 2 ? 1 : 0); }
+
+const CODE  = /^[A-Z0-9]{3,}-[A-Z0-9]{1,3}$/i;
+const SEMOK = /^([1-4]|여름|겨울|하계|동계|계절)$/;
+const CRED  = /^\d{1,2}(\.\d)?$/;
+/* 평점 열: 4.5 · .0 · P/F. 등급 글자는 판독 오류가 잦아 기준으로 쓰지 않는다. */
+const SCORE = /^(0|\.\d+|\d{1,2}\.\d+|P\/F|PF)$/i;
+const BORDER = /[|｜「」ㅣ│┃¦╎丨]/g;
+
+/* 토큰 흐름에서 성적 행을 찾는다.
+   년도 → 학기 → 교과목-분반 → 과목명 → 학점 → 등급 → 평점 순서만 지켜지면
+   줄바꿈이 어긋나거나 등급이 깨져도 인식한다. */
+function parseStream(tk){
+  const out = [];
+  for(let i = 0; i < tk.length - 4; i++){
+    if(!/^(19|20)\d{2}$/.test(tk[i])) continue;
+    if(!SEMOK.test(tk[i+1])) continue;
+    let ci = -1;
+    for(let k = i + 2; k < Math.min(tk.length, i + 7); k++) if(CODE.test(tk[k])){ ci = k; break; }
+    if(ci === -1) continue;
+    const stop = function(k){
+      return /^(19|20)\d{2}$/.test(tk[k]) && k + 1 < tk.length && SEMOK.test(tk[k+1]);
+    };
+    /* 1순위 — 평점 열을 기준점으로 삼는다. 학점 위치까지 함께 검증된다. */
+    let si = -1;
+    for(let k = ci + 4; k < Math.min(tk.length, ci + 13); k++){
+      if(stop(k)) break;
+      if(SCORE.test(tk[k]) && CRED.test(tk[k-2])){ si = k; break; }
+    }
+    let name, credit, score = null, grade = null, passed = true, end;
+    if(si >= 0){
+      name = tk.slice(ci + 1, si - 2).join(' ');
+      credit = parseFloat(tk[si-2]);
+      grade = tk[si-1]; score = tk[si];
+      passed = /^P\/?F$/i.test(score) || parseFloat(score.charAt(0) === '.' ? '0' + score : score) > 0;
+      end = si;
+    }else{
+      /* 2순위 — 등급·평점 열이 가려진 보관성적증명서. 코드 뒤 첫 단독 숫자를 학점으로 본다. */
+      let pi = -1;
+      for(let k = ci + 2; k < Math.min(tk.length, ci + 12); k++){
+        if(stop(k)) break;
+        if(CRED.test(tk[k])){ pi = k; break; }
+      }
+      if(pi === -1) continue;
+      name = tk.slice(ci + 1, pi).join(' ');
+      credit = parseFloat(tk[pi]);
+      end = pi;
+    }
+    name = name.replace(/^[-–—·.]+/, '').trim();
+    if(!name) continue;
+    out.push({year:+tk[i], sem:tk[i+1], name:name, credit:credit,
+              grade:grade, score:score, passed:passed});
+    i = end;
+  }
+  return out;
+}
+function parseText(text){
+  return parseStream(String(text).replace(BORDER, ' ').split(/\s+/).filter(Boolean));
+}
+
+const PDFJS_BASE = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/';
+async function readPdf(file){
+  const buf = await file.arrayBuffer();
+  const doc = await window.pdfjsLib.getDocument({
+    data:new Uint8Array(buf), cMapUrl:PDFJS_BASE + 'cmaps/', cMapPacked:true,
+    standardFontDataUrl:PDFJS_BASE + 'standard_fonts/'
+  }).promise;
+  const lines = [];
+  for(let p = 1; p <= doc.numPages; p++){
+    const page = await doc.getPage(p);
+    const tc = await page.getTextContent();
+    const bucket = {};
+    tc.items.forEach(function(it){
+      if(!it.str) return;
+      const y = Math.round(it.transform[5]);
+      (bucket[y] = bucket[y] || []).push({x:it.transform[4], s:it.str});
+    });
+    Object.keys(bucket).map(Number).sort(function(a,b){ return b - a; }).forEach(function(y){
+      const s = bucket[y].sort(function(a,b){ return a.x - b.x; })
+                         .map(function(o){ return o.s; }).join('').replace(/\s+/g,' ').trim();
+      if(s) lines.push(s);
+    });
+  }
+  return lines;
+}
+
+/* 이수체계도의 교과목명과 완전히 같을 때만 인정한다.
+   공백 · 가운뎃점 · 설명 괄호만 정규화하고, 숫자 괄호는 유지한다. */
+/* 문자층이 없는 PDF는 300dpi로 다시 그려 한국어 OCR로 읽는다. */
+async function loadTesseract(){
+  if(window.Tesseract) return;
+  await new Promise(function(res, rej){
+    const el = document.createElement('script');
+    el.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+    el.onload = res;
+    el.onerror = function(){ rej(new Error('OCR 모듈을 내려받지 못했습니다. 네트워크를 확인해 주세요.')); };
+    document.head.appendChild(el);
+  });
+}
+async function ocrPdf(file, note){
+  note('판독 모듈 내려받는 중');
+  await loadTesseract();
+  const worker = await window.Tesseract.createWorker('kor+eng', 1, {
+    logger:function(m){
+      if(m.status === 'recognizing text') note('글자 판독 중 ' + Math.round(m.progress * 100) + '%');
+      else if(m.status && m.status.indexOf('lang') >= 0) note('한국어 모델 준비 중');
+    }
+  });
+  await worker.setParameters({tessedit_pageseg_mode:'4'});
+  const buf = await file.arrayBuffer();
+  const doc = await window.pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise;
+  let text = '';
+  try{
+    for(let p = 1; p <= doc.numPages; p++){
+      note(doc.numPages > 1 ? p + '/' + doc.numPages + '쪽 변환 중' : '이미지로 변환 중');
+      const page = await doc.getPage(p);
+      const vp = page.getViewport({scale:300 / 72});
+      const cv = document.createElement('canvas');
+      cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+      const cx = cv.getContext('2d');
+      cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height);
+      await page.render({canvasContext:cx, viewport:vp}).promise;
+      const out = await worker.recognize(cv);
+      text += '\n' + out.data.text;
+      cv.width = cv.height = 0;
+    }
+  }finally{ await worker.terminate(); }
+  return text;
+}
+
+function matchCourse(name){
+  const k = NORM(name);
+  if(!k) return {kind:'none'};
+  for(let i = 0; i < INDEX.length; i++) if(INDEX[i].key === k) return {kind:'exact', c:INDEX[i].c};
+  return {kind:'none'};
+}
+
+function ingest(rows){
+  state.rows = rows; state.manual = {}; state.dup = {};
+  state.done = {}; state.plan = {};
+
+  const seen = {};
+  rows.forEach(function(r){ seen[r.year + '-' + r.sem] = true; });
+  state.terms = Object.keys(seen).map(function(key){
+    const p = key.split('-');
+    return {key:key, year:+p[0], sem:p[1], rank:absIdx(+p[0], p[1]) * 10 + semRank(p[1])};
+  }).sort(function(a,b){ return a.rank - b.rank; });
+
+  state.startTerm = 'NEXT';
+
+  rebuildDone();
+  inferOffset();
+  applySplit();
+}
+
+/* 자동 대조 결과에 사용자가 지정한 대응을 덮어쓴다. */
+function mappedName(i){
+  if(state.manual[i] !== undefined) return state.manual[i] || null;
+  const m = matchCourse(state.rows[i].name);
+  return m.kind === 'exact' ? m.c.n : null;
+}
+function rowRank(r){ return absIdx(r.year, r.sem) * 10 + semRank(r.sem); }
+
+/* 재수강은 같은 과목이 두 줄로 나온다(비고에 서로의 학기가 적힌다).
+   같은 과목 중 한 줄만 인정한다 — 이수한 줄을 우선하고, 둘 다 이수면 나중 학기를 쓴다. */
+function rebuildDone(){
+  state.done = {}; state.dup = {};
+  const best = {};
+  state.rows.forEach(function(r, i){
+    const mapped = mappedName(i);
+    const key = mapped || ('~' + NORM(r.name));
+    if(key === '~') return;
+    const prev = best[key];
+    if(prev === undefined){ best[key] = i; return; }
+    const pr = state.rows[prev];
+    const win = (r.passed && !pr.passed) ||
+                (r.passed === pr.passed && rowRank(r) >= rowRank(pr));
+    if(win){ state.dup[prev] = true; best[key] = i; }
+    else { state.dup[i] = true; }
+  });
+  Object.keys(best).forEach(function(key){
+    if(key.charAt(0) === '~') return;
+    const r = state.rows[best[key]];
+    if(!r.passed) return;
+    state.done[key] = {term:r.year + '-' + r.sem, before:false};
+  });
+}
+
+/* 이수체계도 배치와 실제 수강 학기를 대조해 학년 기준선 추정 */
+function inferOffset(){
+  const votes = {};
+  Object.keys(state.done).forEach(function(n){
+    const c = byName(n); if(!c || c.span) return;
+    const p = state.done[n].term.split('-');
+    if(semRank(p[1]) !== 1 && semRank(p[1]) !== 2) return;
+    const off = absIdx(+p[0], p[1]) - nomIdx(c.term);
+    votes[off] = (votes[off] || 0) + 1;
+  });
+  let best = null, bestN = 0;
+  Object.keys(votes).forEach(function(k){ if(votes[k] > bestN){ bestN = votes[k]; best = +k; } });
+  state.offset = best;
+  if(best !== null && state.terms.length){
+    const last = state.terms[state.terms.length - 1];
+    state.curNom = absIdx(last.year, last.sem) - best;
+  }else{
+    state.curNom = null;
+  }
+}
+
+function termRank(key){
+  if(key === 'NEXT'){
+    return state.terms.length ? state.terms[state.terms.length - 1].rank + 1 : 1;
+  }
+  for(let i = 0; i < state.terms.length; i++) if(state.terms[i].key === key) return state.terms[i].rank;
+  return 0;
+}
+function applySplit(){
+  const s = state.startTerm ? termRank(state.startTerm) : 0;
+  Object.keys(state.done).forEach(function(n){
+    state.done[n].before = termRank(state.done[n].term) < s;
+  });
+}
+
+/* ============================================================
+   4. 계산
+   ============================================================ */
+function crOf(c){ return c.cr; }
+/* 계열 전용 과목도 교차 이수 가능 — 전공과 무관하게 모두 담을 수 있다. */
+function visible(c){ return true; }
+/* 지난 학기에만 열리는 과목은 담을 수 없음 */
+function passedTerm(c){
+  if(c.span || state.curNom === null) return false;
+  return nomIdx(c.term) <= state.curNom;
+}
+function selectable(c){ return visible(c) && !state.done[c.n] && !passedTerm(c); }
+
+function compute(){
+  let bBefore = 0, bAfter = 0, aAfter = 0, aBefore = [];
+  const mustHit = [];
+  COURSES.forEach(function(c){
+    const d = state.done[c.n];
+    if(!d) return;
+    if(c.gr === '기초'){ if(d.before) bBefore += crOf(c); else bAfter += crOf(c); }
+    else { if(d.before) aBefore.push(c.n); else { aAfter += crOf(c); if(c.must) mustHit.push(c.n); } }
+  });
+  let bPlan = 0, aPlan = 0;
+  COURSES.forEach(function(c){
+    if(!state.plan[c.n]) return;
+    if(c.gr === '기초') bPlan += crOf(c);
+    else { aPlan += crOf(c); if(c.must) mustHit.push(c.n); }
+  });
+
+  const carry = Math.min(bBefore, 6);
+  const basicDone = Math.min(carry + bAfter, 9);
+  const basicAll = Math.min(carry + bAfter + bPlan, 9);
+  const basicPlan = basicAll - basicDone;
+  const basicWaste = (carry + bAfter + bPlan) - basicAll;
+
+  const advDone = aAfter, advAll = aAfter + aPlan;
+  const totalDone = basicDone + advDone;
+  const totalAll = basicAll + advAll;
+
+  /* 남은 과목을 모두 담았을 때의 상한 */
+  let maxBasic = 0, maxAdv = 0, maxMust = false;
+  COURSES.forEach(function(c){
+    if(!selectable(c)) return;
+    if(c.gr === '기초') maxBasic += crOf(c); else { maxAdv += crOf(c); if(c.must) maxMust = true; }
+  });
+  const ceilBasic = Math.min(carry + bAfter + maxBasic, 9);
+  const ceilAdv = advDone + maxAdv;
+  const ceilTotal = ceilBasic + ceilAdv;
+  const mustPossible = mustHit.length > 0 || maxMust;
+
+  return {
+    carry:carry, bBefore:bBefore, bAfter:bAfter, bPlan:bPlan,
+    basicDone:basicDone, basicAll:basicAll, basicPlan:basicPlan, basicWaste:basicWaste,
+    advDone:advDone, advAll:advAll, advPlan:aPlan, aBefore:aBefore,
+    totalDone:totalDone, totalAll:totalAll,
+    mustHit:mustHit, mustPossible:mustPossible,
+    ceilTotal:ceilTotal, ceilAdv:ceilAdv, ceilBasic:ceilBasic,
+    ok: totalAll >= 24 && advAll >= 15 && mustHit.length > 0,
+    feasible: ceilTotal >= 24 && ceilAdv >= 15 && mustPossible
+  };
+}
+
+/* ============================================================
+   5. 화면
+   ============================================================ */
+function paint(){
+  const r = compute();
+  const ready = state.rows.length;
+
+  document.getElementById('gval').textContent = r.totalAll;
+  document.getElementById('gstage').textContent = 'GR기초 ' + r.basicAll + ' · GR심화 ' + r.advAll;
+  document.getElementById('barDone').style.width = Math.min(100, r.totalDone / 24 * 100) + '%';
+  document.getElementById('barPlan').style.width = Math.min(100 - r.totalDone / 24 * 100, (r.totalAll - r.totalDone) / 24 * 100) + '%';
+  document.getElementById('sDone').textContent = r.totalDone;
+  document.getElementById('sPlan').textContent = r.totalAll - r.totalDone;
+  document.getElementById('sNeed').textContent = Math.max(0, 24 - r.totalAll);
+  document.getElementById('gauge').classList.toggle('met', r.ok);
+
+  /* 판정 */
+  const v = document.getElementById('verdict');
+  v.className = 'verdict';
+  if(!ready){
+    v.innerHTML = '<h2>보관성적증명서를 올려 주세요</h2><ul>' +
+      '<li>이수한 과목을 읽어 인정 학점과 남은 요건을 계산합니다.</li></ul>';
+  }else if(r.ok){
+    v.className = 'verdict ok';
+    v.innerHTML = '<h2>교과 24학점 요건 충족</h2><ul>' +
+      '<li>GR기초 <b>' + r.basicAll + '학점</b> · GR심화 <b>' + r.advAll + '학점</b>, 필수 교과목 ' +
+      r.mustHit.map(function(n){ return '「' + n + '」'; }).join(', ') + ' 포함.</li>' +
+      (r.totalAll > r.totalDone ? '<li>수강 예정으로 담은 과목이 포함된 결과입니다.</li>' : '') +
+      '</ul><p class="note">Silver 이상은 비교과 15크레딧이 추가로 필요합니다. 이 도구에서는 다루지 않습니다.</p>';
+  }else{
+    const gaps = [];
+    if(r.advAll < 15) gaps.push('GR심화 <b>' + (15 - r.advAll) + '학점</b> 부족');
+    if(r.totalAll < 24) gaps.push('합계 <b>' + (24 - r.totalAll) + '학점</b> 부족');
+    if(!r.mustHit.length) gaps.push('필수 교과목 미확보 — <b>「그린리모델링」 또는 「건축시스템설계」</b> 중 1과목');
+    if(r.aBefore.length) gaps.push('참여 전 이수한 GR심화 <b>' + r.aBefore.length + '과목</b>은 소급 불인정 — ' + r.aBefore.join(', '));
+    if(r.basicWaste > 0) gaps.push('GR기초 <b>' + r.basicWaste + '학점</b>은 9학점 한도를 넘어 인정되지 않습니다');
+    if(!r.feasible){
+      v.className = 'verdict no';
+      const why = [];
+      if(r.ceilAdv < 15) why.push('남은 학기에 열리는 GR심화 과목을 모두 담아도 ' + r.ceilAdv + '학점');
+      if(r.ceilTotal < 24) why.push('상한이 ' + r.ceilTotal + '학점');
+      if(!r.mustPossible) why.push('필수 교과목이 남은 학기에 없음');
+      v.innerHTML = '<h2>현재 조건으로는 24학점을 채울 수 없습니다</h2><ul>' +
+        why.map(function(x){ return '<li>' + x + '</li>'; }).join('') +
+        '</ul><p class="note">참여 시작 학기를 앞당기면 결과가 달라질 수 있습니다. 사업단 확인이 필요한 사항입니다.</p>';
+    }else{
+      v.innerHTML = '<h2>남은 요건</h2><ul>' + gaps.map(function(g){ return '<li>' + g + '</li>'; }).join('') +
+        '</ul><p class="note">남은 과목을 모두 담으면 최대 ' + r.ceilTotal + '학점(GR심화 ' + r.ceilAdv + ')까지 가능합니다.</p>';
+    }
+  }
+
+  renderTally(r);
+  renderPath();
+
+  const gm = document.getElementById('gateMust');
+  gm.classList.toggle('met', r.mustHit.length > 0);
+  gm.innerHTML = '<span class="gm">' + (r.mustHit.length ? '확보' : '미확보') + '</span><span>' +
+    (r.mustHit.length
+      ? '필수 교과목 ' + r.mustHit.map(function(n){ return '「' + n + '」'; }).join(', ')
+      : '필수 교과목 없음 — 「그린리모델링」 또는 「건축시스템설계」 중 1과목') +
+    '</span>';
+}
+
+function renderTally(r){
+  const el = document.getElementById('tally');
+  let h = '';
+  h += row('참여 전 GR기초 소급', '이수 ' + r.bBefore + '학점 중 6학점 한도', r.carry);
+  h += row('참여 후 GR기초', '한도 9학점까지, 잔여 ' + Math.max(0, 9 - r.carry) + '학점', r.bAfter + r.bPlan);
+  h += row('GR심화', r.aBefore.length ? '참여 전 ' + r.aBefore.length + '과목은 소급 불인정' : '소급 인정 없음', r.advAll);
+  h += '<div class="trow sum"><span class="tk">인정 합계</span><span class="tv">' + r.totalAll + ' / 24</span></div>';
+  el.innerHTML = h;
+
+  const need = Math.max(0, 24 - r.carry - r.advDone - r.bAfter);
+  const rr = document.getElementById('routes');
+  const slot = Math.max(0, 9 - r.carry - r.bAfter);
+  rr.innerHTML =
+    '<div class="route' + (r.basicPlan > 0 ? ' on' : '') + '"><div class="rname">GR기초 + GR심화</div>' +
+    '<div class="rbody">GR기초 ' + slot + '학점 + GR심화 ' + Math.max(0, need - slot) + '학점<br>남은 GR기초 슬롯을 쓰는 경로</div></div>' +
+    '<div class="route' + (r.basicPlan === 0 && r.advPlan > 0 ? ' on' : '') + '"><div class="rname">GR심화 단독</div>' +
+    '<div class="rbody">GR심화 ' + need + '학점<br>GR기초를 더 듣지 않는 경로</div></div>';
+}
+function row(k, sub, v){
+  return '<div class="trow' + (v ? '' : ' dim') + '"><span class="tk">' + k +
+         '<em>' + sub + '</em></span><span class="tv">' + v + '</span></div>';
+}
+
+function renderPath(){
+  const el = document.getElementById('path');
+  if(!state.rows.length){ el.innerHTML = '<p class="empty">보관성적증명서를 올리면 경로가 표시됩니다.</p>'; return; }
+  let h = '';
+  TERMS.forEach(function(t){
+    const list = COURSES.filter(function(c){ return c.term === t && visible(c); });
+    if(!list.length) return;
+    let sum = 0;
+    list.forEach(function(c){ if(state.done[c.n] || state.plan[c.n]) sum += crOf(c); });
+    h += '<div class="term-block"><div class="term-head"><span class="tname">' + TERM_LABEL[t] +
+         '</span><span class="tmeta">' + (sum ? sum + '학점' : '') + '</span></div>';
+    list.forEach(function(c){ h += courseRow(c); });
+    h += '</div>';
+  });
+  h += '<p class="hint">계열 전용 과목도 교차 이수할 수 있어 전공과 무관하게 모두 담을 수 있습니다. 이수체계도상 5학년에는 특성화 교과목이 없습니다.</p>';
+  el.innerHTML = h;
+}
+
+function courseRow(c){
+  const d = state.done[c.n];
+  const planned = !!state.plan[c.n];
+  let cls = 'cw tr-' + c.track, st = '담기', lock = false;
+  if(d){
+    if(c.gr === '심화' && d.before){ cls += ' done warn'; st = '소급 불인정'; }
+    else { cls += ' done'; st = '이수 ' + d.term; }
+    lock = true;
+  }else if(passedTerm(c)){ cls += ' locked'; st = '지난 학기'; lock = true; }
+  else if(planned){ cls += ' planned'; st = '수강 예정'; }
+  const marks = (c.star ? '<span class="mark">★</span>' : '') + (c.must ? '<span class="mark">◆</span>' : '');
+  const meta = ['공통','건축학','건축공학'][{common:0,arch:1,eng:2}[c.track]] +
+               ' · ' + c.req + (c.reqOf ? '(' + (c.reqOf === 'arch' ? '건축학' : '건축공학') + ')' : '') +
+               ' · GR' + c.gr + ' ' + crOf(c) + '학점' + (c.note ? ' · ' + c.note : '');
+  return '<div class="' + cls + '"' + (lock ? '' : ' data-pick="' + c.n + '" role="button" tabindex="0"') + '>' +
+         '<span class="cn">' + c.n + marks + '<span class="cm">' + meta + '</span></span>' +
+         '<span class="cs">' + st + '</span></div>';
+}
+
+/* ============================================================
+   6. 판독 결과
+   ============================================================ */
+function renderImport(err, showPaste){
+  const box = document.getElementById('importResult');
+  if(err){
+    box.innerHTML = '<div class="maybe"><h3>파일을 읽지 못했습니다</h3><p>' + err + '</p></div>';
+    if(showPaste) document.getElementById('pasteBox').open = true;
+    return;
+  }
+  if(!state.rows.length){ box.innerHTML = ''; return; }
+
+  let nb = 0, na = 0;
+  Object.keys(state.done).forEach(function(n){
+    const c = byName(n); if(!c) return;
+    if(c.gr === '기초') nb++; else na++;
+  });
+
+  const noScore = state.rows.length && state.rows.every(function(r){ return r.score === null; });
+  let h = '';
+  if(noScore){
+    h += '<div class="srcnote"><b>등급 · 평점 열이 없는 보관성적증명서입니다.</b> 학점까지만 읽었으므로 ' +
+         '미이수(F) 과목을 구분할 수 없습니다. 재수강 전 F를 받은 과목이 있으면 아래 목록에서 해당 없음으로 바꿔 주세요.</div>';
+  }
+  if(state.source === 'ocr'){
+    h += '<div class="srcnote"><b>이미지 판독으로 읽었습니다.</b> 글자를 그림에서 인식한 결과라 과목명이 틀릴 수 있습니다. ' +
+         '아래 목록에서 인식 결과를 확인하고, 잘못 잡힌 과목은 직접 지정해 주세요.</div>';
+  }
+  h += '<div class="summary">' +
+    '<div><div class="k">인식 과목</div><div class="v">' + state.rows.length + '</div></div>' +
+    '<div><div class="k">이수 학기</div><div class="v">' + state.terms.length + '</div></div>' +
+    '<div><div class="k">GR기초 이수</div><div class="v">' + nb + '</div></div>' +
+    '<div><div class="k">GR심화 이수</div><div class="v">' + na + '</div></div>' +
+    '</div>';
+
+  h += '<div class="field"><div class="fhead"><span class="fname">이수 학기 · 참여 시작 학기 지정</span>' +
+       '<span class="fval">' + (state.curNom !== null ? '현재 ' + (Math.floor(state.curNom / 2) + 1) + '학년 ' + (state.curNom % 2 + 1) + '학기' : state.terms.length + '개 학기') +
+       '</span></div><div class="chips">';
+  state.terms.forEach(function(t, i){
+    const after = state.startTerm && t.rank >= termRank(state.startTerm);
+    h += '<button type="button" class="chip' + (after ? ' on' : '') + '" data-term="' + t.key + '">' +
+         t.year + '-' + t.sem + '<span class="n">' + (i + 1) + '차</span></button>';
+  });
+  h += '<button type="button" class="chip plain' + (state.startTerm === 'NEXT' ? ' on' : '') +
+       '" data-term="NEXT">다음 학기부터</button>';
+  h += '</div><p class="hint">참여를 시작한 학기를 누르면 그 학기부터 참여 후로 처리합니다. 지금 등록하는 경우가 기본값입니다. 참여 전 GR기초는 6학점까지 소급되고 GR심화는 소급되지 않습니다.' +
+       (state.offset === null ? ' 학년은 특성화 교과목 이수 기록이 있어야 추정됩니다.' : '') + '</p></div>';
+
+  /* 행별 인식 결과 확인 */
+  const opts = COURSES.map(function(c){
+    return '<option value="' + c.n + '" data-gr="' + c.gr + '">' + c.n + '</option>';
+  }).join('');
+  const ndup = Object.keys(state.dup).length;
+  h += '<details class="rest"' + (state.source === 'ocr' ? ' open' : '') + '>' +
+       '<summary>인식한 과목 ' + state.rows.length + '개 확인 · 이수체계도 대응 ' + (nb + na) + '개' +
+       (ndup ? ' · 재수강 중복 ' + ndup + '개' : '') + '</summary>' +
+       '<div class="rowtab">';
+  state.rows.forEach(function(r, i){
+    const cur = mappedName(i);
+    const manual = state.manual[i] !== undefined && state.manual[i];
+    const isDup = !!state.dup[i];
+    h += '<div class="rrow' + (cur && !isDup ? ' on' : '') + (r.passed ? '' : ' fail') +
+         (isDup ? ' dup' : '') + '">' +
+         '<span class="rt">' + r.year + '-' + r.sem + '</span>' +
+         '<span class="rn">' + r.name + (manual ? '<em>직접 지정</em>' : '') +
+         (isDup ? '<em class="dupe">재수강 중복</em>' : '') + '</span>' +
+         '<span class="rc">' + r.credit + '</span>';
+    if(r.passed){
+      h += '<select class="rsel" data-row="' + i + '"><option value="">해당 없음</option>' + opts + '</select>';
+    }else{
+      h += '<span class="rx">미이수</span>';
+    }
+    h += '</div>';
+  });
+  h += '</div><p class="hint">이수체계도의 교과목명과 완전히 같을 때만 자동으로 잡힙니다. 학번대가 달라 이름이 바뀐 과목이나 판독 오류는 오른쪽에서 직접 지정할 수 있습니다.' +
+       (ndup ? ' 같은 과목이 여러 번 나오면 한 줄만 계산에 넣습니다. 이수한 줄을 우선하고, 둘 다 이수면 나중 학기를 씁니다.' : '') +
+       '</p></details>';
+
+  box.innerHTML = h;
+  state.rows.forEach(function(r, i){
+    const sel = box.querySelector('[data-row="' + i + '"]');
+    if(sel) sel.value = mappedName(i) || '';
+  });
+}
+
+/* ============================================================
+   7. 이벤트
+   ============================================================ */
+const fileInput = document.getElementById('file');
+const drop = document.getElementById('drop');
+
+async function handleFile(f){
+  if(!f) return;
+  if(!/\.pdf$/i.test(f.name) && f.type !== 'application/pdf'){ renderImport('PDF 파일만 읽을 수 있습니다.'); return; }
+  if(!window.pdfjsLib){ renderImport('PDF 판독 모듈을 불러오지 못했습니다. 네트워크 연결을 확인해 주세요.'); return; }
+  drop.classList.add('busy');
+  const note = function(msg){ drop.querySelector('.dmain').textContent = msg; };
+  note('읽는 중');
+  try{
+    const lines = await readPdf(f);
+    let rows = parseText(lines.join('\n'));
+    let src = 'text';
+    if(!rows.length){
+      note('문자 정보가 없어 이미지 판독으로 전환합니다');
+      const text = await ocrPdf(f, note);
+      rows = parseText(text);
+      src = 'ocr';
+    }
+    if(!rows.length){
+      renderImport('성적 행을 찾지 못했습니다. 표 형식이 다를 수 있으니 아래 붙여넣기를 이용해 주세요.', true);
+    }else { state.source = src; ingest(rows); renderImport(null); }
+  }catch(e){
+    const m = String(e && e.message || e);
+    if(/Worker|blob:/i.test(m)){
+      renderImport('이 화면에서는 브라우저가 판독 작업자(Worker) 생성을 막아 이미지 판독을 실행할 수 없습니다. ' +
+        '파일을 웹서버에 올려 정상 주소로 열면 동작합니다. 지금은 아래 붙여넣기를 이용해 주세요.', true);
+    }else{
+      renderImport('판독 중 오류가 발생했습니다: ' + m, true);
+    }
+  }
+  drop.classList.remove('busy'); drop.querySelector('.dmain').textContent = 'PDF 파일 선택';
+  paint();
+}
+fileInput.addEventListener('change', function(e){ handleFile(e.target.files[0]); });
+
+document.getElementById('pasteRun').addEventListener('click', function(){
+  const rows = parseText(document.getElementById('pasteArea').value);
+  if(!rows.length){
+    renderImport('붙여넣은 내용에서 성적 행을 찾지 못했습니다. 년도 · 학기 · 교과목-분반 · 과목 · 학점 · 등급이 모두 들어가도록 복사했는지 확인해 주세요.', true);
+  }else{ state.source = 'paste'; ingest(rows); renderImport(null); }
+  paint();
+});
+['dragenter','dragover'].forEach(function(ev){ drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.add('over'); }); });
+['dragleave','drop'].forEach(function(ev){ drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.remove('over'); }); });
+drop.addEventListener('drop', function(e){ handleFile(e.dataTransfer.files[0]); });
+
+function pick(name){
+  if(!name) return;
+  state.plan[name] = !state.plan[name];
+  paint();
+}
+document.addEventListener('change', function(e){
+  const ri = e.target.getAttribute ? e.target.getAttribute('data-row') : null;
+  if(ri === null || ri === undefined) return;
+  state.manual[+ri] = e.target.value;
+  rebuildDone(); inferOffset(); applySplit(); renderImport(null); paint();
+});
+
+document.addEventListener('click', function(e){
+  const t = e.target.closest ? e.target.closest('[data-term]') : null;
+  if(t){ state.startTerm = t.getAttribute('data-term'); applySplit(); renderImport(null); paint(); return; }
+  const pk = e.target.closest ? e.target.closest('[data-pick]') : null;
+  if(pk) pick(pk.getAttribute('data-pick'));
+});
+document.addEventListener('keydown', function(e){
+  if(e.key !== 'Enter' && e.key !== ' ') return;
+  const pk = e.target.closest ? e.target.closest('[data-pick]') : null;
+  if(pk){ e.preventDefault(); pick(pk.getAttribute('data-pick')); }
+});
+
+document.getElementById('reset').addEventListener('click', function(){
+  state.rows = []; state.terms = []; state.startTerm = null;
+  state.offset = null; state.curNom = null; state.done = {}; state.plan = {};
+  state.source = null; state.manual = {}; state.dup = {};
+  fileInput.value = '';
+  document.getElementById('pasteArea').value = '';
+  document.getElementById('importResult').innerHTML = '';
+  paint();
+  window.scrollTo({top:0, behavior:'smooth'});
+});
+
+const statusEl = document.querySelector('.status');
+let ticking = false;
+window.addEventListener('scroll', function(){
+  if(ticking) return;
+  ticking = true;
+  window.requestAnimationFrame(function(){
+    statusEl.classList.toggle('compact', window.scrollY > 240); ticking = false;
+  });
+}, {passive:true});
+
+/* ============================================================
+   8. 기준 검토
+   ============================================================ */
+const REVIEW = [
+  {ok:true, h:'계열 전용 과목도 교차 이수 가능',
+   p:'이수체계도의 건축학 · 공통 · 건축공학 구분은 편성 표기이며 수강 제약이 아닙니다. GR기초와 GR심화 모두 전공과 무관하게 이수할 수 있습니다.',
+   src:'사업단 확정',
+   applied:'경로에 전 과목을 표시하고 전공 선택 입력을 없앴습니다. 계열은 왼쪽 색 막대로만 구분해 표시합니다.'},
+
+  {ok:true, h:'학점은 정규 학점과 동일하게 산정',
+   p:'이수체계도에 표기된 학점을 그대로 인정합니다. 건축기초설계2와 건축설계(1)(2)는 4학점, 건축설계(5)는 6학점입니다. 사업계획서의 3학점 균일 산정 규정은 사유서 수정으로 대체되었습니다.',
+   src:'사업단 확정 · 사유서 수정분',
+   applied:'체계도 표기 학점으로 계산합니다.'},
+
+  {ok:true, h:'특성화 필수 교과목은 두 과목 중 1과목',
+   p:'「그린리모델링」 또는 「건축시스템설계」 중 1과목 이상을 이수해야 합니다.',
+   src:'사업단 확정',
+   applied:'두 과목 중 하나라도 이수 또는 수강 예정으로 담기면 충족으로 판정합니다.'},
+
+  {ok:true, h:'Green 단계 = 교과 24학점',
+   p:'GR기초 최대 9학점과 GR심화 15학점 이상을 합해 24학점입니다. 브리핑과 상세안내서의 심화 15학점 표기는 하위 조건으로 함께 검사합니다.',
+   src:'사업단 확정',
+   applied:'합계 24학점, GR심화 15학점, 필수 교과목 1과목을 모두 만족해야 충족으로 판정합니다.'},
+
+  {ok:true, h:'GR심화는 소급 인정 없음',
+   p:'참여 전에 이수한 GR심화 교과목은 예외 없이 인정되지 않습니다. GR기초는 참여 전 이수분을 6학점까지 소급합니다.',
+   src:'사업단 확정',
+   applied:'참여 전 GR심화 과목은 목록에 표시하되 학점에서 제외하고 판정문에 과목명을 적습니다.'},
+
+  {ok:true, h:'참여 자격은 건축학부 재학생',
+   p:'학년 조건은 없습니다.',
+   src:'사업단 확정',
+   applied:'학년은 판정에 쓰지 않고, 남은 학기를 계산하기 위한 참고값으로만 추정합니다.'},
+
+  {ok:true, h:'GR심화 교과목 구성은 이수체계도 기준',
+   p:'사업계획서 분류표에 있던 건축디지털트윈과 친환경통합시스템이 빠지고 구조시스템설계와 건설관리의 이해가 들어왔습니다. 교과목명은 건물성능분석, 건축설계(1)(2)(5)로 통일합니다.',
+   src:'최신 이수체계도 · 학생 배포자료 수정 완료',
+   applied:'체계도의 교과목과 학년-학기 배치를 그대로 옮겼습니다. 옛 이름인 건물에너지분석도 같은 과목으로 인식합니다.'},
+
+  {ok:true, h:'탄소중립 관련 주제 수행 과목',
+   p:'「건축시스템설계」와 「건축연구」는 학점으로 산정하되, 탄소중립 관련 주제를 수행한 경우 검토 후 반영합니다.',
+   src:'사업단 확정',
+   applied:'두 과목을 이수 학점에 포함하고, 경로 화면의 과목 설명에 검토 대상임을 표기합니다.'},
+
+  {h:'현장실습은 이 도구에서 제외',
+   p:'표준현장실습은 단기집중형 2~3학점, 정규학기 몰입형 12~15학점으로 폭이 있고 정규학기 몰입형은 비교과 크레딧으로도 동시에 인정됩니다. 산정 방식이 정해지지 않아 우선 제외했습니다.',
+   src:'이수체계도 현장실습 / 추후 논의',
+   applied:'경로와 학점 계산 모두에서 뺐습니다. 실제로는 현장실습으로 부족분을 메우는 경로가 있을 수 있습니다.'},
+
+  {h:'비교과 영역은 추후 논의',
+   p:'이 도구는 교과 24학점만 다룹니다. Silver 이상에 필요한 비교과 15크레딧과 유형별 적립 상한은 별도 검토 대상입니다.',
+   src:'추후 논의',
+   applied:'비교과는 계산에 포함하지 않습니다.'}
+];
+
+function renderReview(){
+  let h = '';
+  REVIEW.forEach(function(it){
+    h += '<div class="item' + (it.ok ? ' done' : ' flag') + '">' +
+         '<h3>' + it.h + '</h3><p>' + it.p + '</p>' +
+         '<p class="src">' + it.src + '</p>' +
+         (it.applied ? '<p class="applied">' + it.applied + '</p>' : '') + '</div>';
+  });
+  document.getElementById('review').innerHTML = h;
+  const nOk = REVIEW.filter(function(i){ return i.ok; }).length;
+  document.getElementById('flagCount').textContent =
+    '확정 ' + nOk + '건 · 논의 ' + (REVIEW.length - nOk) + '건';
+}
+
+document.getElementById('reviewToggle').addEventListener('click', function(){
+  const open = document.getElementById('review').classList.toggle('open');
+  this.setAttribute('aria-expanded', open ? 'true' : 'false');
+});
+
+/* ============================================================
+   9. 초기화
+   ============================================================ */
+if(window.pdfjsLib) window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_BASE + 'build/pdf.worker.min.js';
+renderReview();
+paint();
+</script>
+</body>
+</html>
