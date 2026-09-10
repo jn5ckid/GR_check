@@ -228,7 +228,7 @@
   <div class="header-inner">
     <div class="eyebrow">국토교통부 · 국토안전관리원 국고보조사업 / 2026–2028</div>
     <h1 class="title">그린리모델링 인재양성 플랫폼<br><span class="accent">교과 이수 점검</span></h1>
-    <p class="lede">보관성적증명서를 올리고 전공과 참여 시작 학기를 지정하면, 교과 24학점 요건을 채울 수 있는지와 어떤 과목이 남아 있는지를 계산합니다.</p>
+    <p class="lede">보관성적증명서를 올리면 이수한 과목과 학기를 읽어, 교과 24학점 요건을 채울 수 있는지와 어떤 과목이 남아 있는지를 계산합니다.</p>
   </div>
 </header>
 
@@ -385,8 +385,18 @@ function semRank(s){ const v = SEMRANK[s]; if(v !== undefined) return v; const n
 function nomIdx(term){ const p = term.split('-'); return (+p[0] - 1) * 2 + (+p[1] - 1); }
 function absIdx(year, sem){ return year * 2 + (semRank(sem) >= 2 ? 1 : 0); }
 
-const CODE  = /^[A-Z0-9]{3,}-[A-Z0-9]{1,3}$/i;
-const SEMOK = /^([1-4]|여름|겨울|하계|동계|계절)$/;
+/* 교과목-분반. 판독 과정에서 분반이 떨어져 번호만 남는 경우도 받는다. */
+const CODE  = /^([A-Z0-9]{3,}-[A-Z0-9]{1,3}|[0-9]{5,})$/i;
+
+/* 학기 표기를 정규화한다. 판독에서 "여름"이 "름"으로 깨지는 일이 잦다. */
+function normSem(t){
+  if(/^[1-4]$/.test(t)) return t;
+  if(t.length > 3) return null;
+  if(/름|하계/.test(t)) return '여름';
+  if(/겨|울|을|동계/.test(t)) return '겨울';
+  if(/계절/.test(t)) return '여름';
+  return null;
+}
 const CRED  = /^\d{1,2}(\.\d)?$/;
 /* 평점 열: 4.5 · .0 · P/F. 등급 글자는 판독 오류가 잦아 기준으로 쓰지 않는다. */
 const SCORE = /^(0|\.\d+|\d{1,2}\.\d+|P\/F|PF)$/i;
@@ -399,12 +409,13 @@ function parseStream(tk){
   const out = [];
   for(let i = 0; i < tk.length - 4; i++){
     if(!/^(19|20)\d{2}$/.test(tk[i])) continue;
-    if(!SEMOK.test(tk[i+1])) continue;
+    const sem = normSem(tk[i+1]);
+    if(!sem) continue;
     let ci = -1;
     for(let k = i + 2; k < Math.min(tk.length, i + 7); k++) if(CODE.test(tk[k])){ ci = k; break; }
     if(ci === -1) continue;
     const stop = function(k){
-      return /^(19|20)\d{2}$/.test(tk[k]) && k + 1 < tk.length && SEMOK.test(tk[k+1]);
+      return /^(19|20)\d{2}$/.test(tk[k]) && k + 1 < tk.length && normSem(tk[k+1]) !== null;
     };
     /* 1순위 — 평점 열을 기준점으로 삼는다. 학점 위치까지 함께 검증된다. */
     let si = -1;
@@ -433,7 +444,7 @@ function parseStream(tk){
     }
     name = name.replace(/^[-–—·.]+/, '').trim();
     if(!name) continue;
-    out.push({year:+tk[i], sem:tk[i+1], name:name, credit:credit,
+    out.push({year:+tk[i], sem:sem, name:name, credit:credit,
               grade:grade, score:score, passed:passed});
     i = end;
   }
@@ -627,26 +638,13 @@ function rebuildDone(){
   });
 }
 
-/* 이수체계도 배치와 실제 수강 학기를 대조해 학년 기준선 추정 */
+/* 학년은 이수한 정규학기 수로 센다. 2개 학기가 1개 학년이다.
+   계절학기와 재수강은 학기 수에 넣지 않으므로 휴학이 있어도 어긋나지 않는다. */
 function inferOffset(){
-  const votes = {};
-  Object.keys(state.done).forEach(function(n){
-    const c = byName(n); if(!c || c.span) return;
-    const p = state.done[n].term.split('-');
-    if(semRank(p[1]) !== 1 && semRank(p[1]) !== 2) return;
-    const off = absIdx(+p[0], p[1]) - nomIdx(c.term);
-    votes[off] = (votes[off] || 0) + 1;
-  });
-  let best = null, bestN = 0;
-  Object.keys(votes).forEach(function(k){ if(votes[k] > bestN){ bestN = votes[k]; best = +k; } });
-  state.offset = best;
-  if(best !== null && state.terms.length){
-    const last = state.terms[state.terms.length - 1];
-    state.curNom = absIdx(last.year, last.sem) - best;
-  }else{
-    state.curNom = null;
-  }
+  state.offset = state.terms.length ? 0 : null;
+  state.curNom = state.terms.length ? state.terms.length - 1 : null;
 }
+function nomOf(i){ return {y:Math.floor(i / 2) + 1, t:i % 2 + 1}; }
 
 function termRank(key){
   if(key === 'NEXT') return (state.maxRank || 0) + 1;
@@ -882,17 +880,19 @@ function renderImport(err, showPaste){
     '</div>';
 
   h += '<div class="field"><div class="fhead"><span class="fname">이수 학기 · 참여 시작 학기 지정</span>' +
-       '<span class="fval">' + (state.curNom !== null ? '현재 ' + (Math.floor(state.curNom / 2) + 1) + '학년 ' + (state.curNom % 2 + 1) + '학기' : state.terms.length + '개 학기') +
-       '</span></div><div class="chips">';
+       '<span class="fval">' + (state.curNom !== null
+         ? state.terms.length + '개 학기 이수 · ' + nomOf(state.curNom).y + '학년 ' + nomOf(state.curNom).t + '학기'
+         : '학기 없음') + '</span></div><div class="chips">';
   state.terms.forEach(function(t, i){
     const after = state.startTerm && t.rank >= termRank(state.startTerm);
+    const g = nomOf(i);
     h += '<button type="button" class="chip' + (after ? ' on' : '') + '" data-term="' + t.key + '">' +
-         t.year + '-' + t.sem + '<span class="n">' + (i + 1) + '차</span></button>';
+         t.year + '-' + t.sem + '<span class="n">' + g.y + '-' + g.t + '</span></button>';
   });
   h += '<button type="button" class="chip plain' + (state.startTerm === 'NEXT' ? ' on' : '') +
        '" data-term="NEXT">다음 학기부터</button>';
-  h += '</div><p class="hint">정규학기만 표시합니다. 여름 · 겨울 계절학기는 학기 수에 넣지 않지만 그때 이수한 과목의 학점은 인정됩니다. 참여를 시작한 학기를 누르면 그 학기부터 참여 후로 처리합니다. 지금 등록하는 경우가 기본값입니다. 참여 전 GR기초는 6학점까지 소급되고 GR심화는 소급되지 않습니다.' +
-       (state.offset === null ? ' 학년은 특성화 교과목 이수 기록이 있어야 추정됩니다.' : '') + '</p></div>';
+  h += '</div><p class="hint">정규학기만 세어 두 학기를 한 학년으로 봅니다. 칩 오른쪽의 작은 숫자가 학년-학기입니다. 여름 · 겨울 계절학기는 학기 수에 넣지 않지만 그때 이수한 과목의 학점은 인정됩니다. 참여를 시작한 학기를 누르면 그 학기부터 참여 후로 처리합니다. 지금 등록하는 경우가 기본값입니다. 참여 전 GR기초는 6학점까지 소급되고 GR심화는 소급되지 않습니다.' +
+       (state.offset === null ? '' : '') + '</p></div>';
 
   /* 행별 인식 결과 확인 */
   const opts = COURSES.map(function(c){
