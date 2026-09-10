@@ -492,45 +492,93 @@ async function readPdf(file){
 
 /* 이수체계도의 교과목명과 완전히 같을 때만 인정한다.
    공백 · 가운뎃점 · 설명 괄호만 정규화하고, 숫자 괄호는 유지한다. */
-/* 문자층이 없는 PDF는 300dpi로 다시 그려 한국어 OCR로 읽는다. */
+/* 문자층이 없는 PDF는 다시 렌더링해 한국어 OCR로 읽는다.
+   실패 지점을 단계별로 남겨 진단할 수 있게 한다. */
+const TESS_VER = '5.1.1';
+const TESS_CDN = 'https://cdn.jsdelivr.net/npm/tesseract.js@' + TESS_VER + '/dist/';
+const TESS_CORE = 'https://cdn.jsdelivr.net/npm/tesseract.js-core@' + TESS_VER;
+/* 한국어 모델도 같은 CDN에서 받는다 — 외부 의존을 한 곳으로 모은다. */
+const TESS_LANG = 'https://cdn.jsdelivr.net/npm/@tesseract.js-data/kor@1.0.0/4.0.0';
+let ocrStage = '';
+
+function withTimeout(promise, ms, label){
+  let t;
+  return Promise.race([
+    promise,
+    new Promise(function(_, rej){
+      t = setTimeout(function(){ rej(new Error(label + ' 응답이 ' + Math.round(ms/1000) + '초 안에 오지 않았습니다')); }, ms);
+    })
+  ]).finally(function(){ clearTimeout(t); });
+}
+
 async function loadTesseract(){
   if(window.Tesseract) return;
   await new Promise(function(res, rej){
     const el = document.createElement('script');
-    el.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+    el.src = TESS_CDN + 'tesseract.min.js';
     el.onload = res;
-    el.onerror = function(){ rej(new Error('OCR 모듈을 내려받지 못했습니다. 네트워크를 확인해 주세요.')); };
+    el.onerror = function(){ rej(new Error('스크립트를 내려받지 못했습니다 (' + el.src + ')')); };
     document.head.appendChild(el);
   });
+  if(!window.Tesseract) throw new Error('스크립트는 받았지만 Tesseract 객체가 없습니다');
 }
+
+/* 경로를 지정해 만들어 보고, 실패하면 기본값으로 한 번 더 시도한다. */
+async function makeWorker(note){
+  const logger = function(m){
+    if(m.status === 'recognizing text') note('글자 판독 중 ' + Math.round(m.progress * 100) + '%');
+    else if(m.status === 'loading language traineddata') note('한국어 모델 받는 중');
+    else if(m.status) note('판독 준비 중');
+  };
+  try{
+    return await withTimeout(window.Tesseract.createWorker('kor', 1, {
+      logger:logger, workerPath:TESS_CDN + 'worker.min.js', corePath:TESS_CORE, langPath:TESS_LANG
+    }), 90000, '판독 모듈');
+  }catch(e1){
+    try{
+      return await withTimeout(window.Tesseract.createWorker('kor', 1, {logger:logger}), 90000, '판독 모듈(기본 경로)');
+    }catch(e2){
+      throw new Error('지정 경로 — ' + (e1 && e1.message || e1) + ' / 기본 경로 — ' + (e2 && e2.message || e2));
+    }
+  }
+}
+
 async function ocrPdf(file, note){
+  ocrStage = '판독 모듈 내려받기';
   note('판독 모듈 내려받는 중');
   await loadTesseract();
-  const worker = await window.Tesseract.createWorker('kor+eng', 1, {
-    logger:function(m){
-      if(m.status === 'recognizing text') note('글자 판독 중 ' + Math.round(m.progress * 100) + '%');
-      else if(m.status && m.status.indexOf('lang') >= 0) note('한국어 모델 준비 중');
-    }
-  });
+
+  ocrStage = '판독 작업자 생성';
+  note('판독 준비 중');
+  const worker = await makeWorker(note);
+  /* 표 형태 문서는 단일 열(psm 4)로 읽어야 행이 유지된다. 기본값(자동)은 괘선에 걸려 깨진다. */
   await worker.setParameters({tessedit_pageseg_mode:'4'});
+
   const buf = await file.arrayBuffer();
   const doc = await window.pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise;
   let text = '';
   try{
     for(let p = 1; p <= doc.numPages; p++){
+      ocrStage = p + '쪽 이미지 변환';
       note(doc.numPages > 1 ? p + '/' + doc.numPages + '쪽 변환 중' : '이미지로 변환 중');
       const page = await doc.getPage(p);
-      const vp = page.getViewport({scale:300 / 72});
+      let scale = 250 / 72;
+      const base = page.getViewport({scale:1});
+      if(base.width * scale > 3000) scale = 3000 / base.width;   /* 메모리 상한 */
+      const vp = page.getViewport({scale:scale});
       const cv = document.createElement('canvas');
       cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
       const cx = cv.getContext('2d');
       cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height);
       await page.render({canvasContext:cx, viewport:vp}).promise;
-      const out = await worker.recognize(cv);
+
+      ocrStage = p + '쪽 글자 판독';
+      const out = await withTimeout(worker.recognize(cv), 180000, p + '쪽 판독');
       text += '\n' + out.data.text;
       cv.width = cv.height = 0;
     }
-  }finally{ await worker.terminate(); }
+  }finally{ try{ await worker.terminate(); }catch(e){} }
+  ocrStage = '';
   return text;
 }
 
@@ -878,7 +926,7 @@ function renderImport(err, showPaste){
          '<span class="rt">' + r.year + '-' + r.sem + '</span>' +
          '<span class="rn">' + r.name + (manual ? '<em>직접 지정</em>' : '') +
          (isDup ? '<em class="dupe">재수강 중복</em>' : '') + '</span>' +
-         '<span class="rc">' + r.credit + '</span>';
+         '<span class="rc">' + (cur && byName(cur) ? byName(cur).cr : r.credit) + '</span>';
     if(r.passed){
       h += '<select class="rsel" data-row="' + i + '"><option value="">해당 없음</option>' + opts + '</select>';
     }else{
@@ -886,7 +934,7 @@ function renderImport(err, showPaste){
     }
     h += '</div>';
   });
-  h += '</div><p class="hint">이수체계도의 교과목명과 완전히 같을 때만 자동으로 잡힙니다. 학번대가 달라 이름이 바뀐 과목이나 판독 오류는 오른쪽에서 직접 지정할 수 있습니다.' +
+  h += '</div><p class="hint">학점은 이수체계도에 표기된 값으로 계산하므로 증명서 판독값과 다를 수 있습니다. 이수체계도의 교과목명과 완전히 같을 때만 자동으로 잡힙니다. 학번대가 달라 이름이 바뀐 과목이나 판독 오류는 오른쪽에서 직접 지정할 수 있습니다.' +
        (ndup ? ' 같은 과목이 여러 번 나오면 한 줄만 계산에 넣습니다. 이수한 줄을 우선하고, 둘 다 이수면 나중 학기를 씁니다.' : '') +
        '</p></details>';
 
@@ -925,11 +973,12 @@ async function handleFile(f){
     }else { state.source = src; ingest(rows); renderImport(null); }
   }catch(e){
     const m = String(e && e.message || e);
+    const where = ocrStage ? '[' + ocrStage + '] ' : '';
     if(/Worker|blob:/i.test(m)){
-      renderImport('이 화면에서는 브라우저가 판독 작업자(Worker) 생성을 막아 이미지 판독을 실행할 수 없습니다. ' +
-        '파일을 웹서버에 올려 정상 주소로 열면 동작합니다. 지금은 아래 붙여넣기를 이용해 주세요.', true);
+      renderImport('브라우저가 판독 작업자(Worker) 생성을 막았습니다. 미리보기 화면이나 file:// 로 연 경우에 나타납니다. ' +
+        '웹서버에 올린 정상 주소로 열어 주세요. ' + where + m, true);
     }else{
-      renderImport('판독 중 오류가 발생했습니다: ' + m, true);
+      renderImport('이미지 판독에 실패했습니다. ' + where + m, true);
     }
   }
   drop.classList.remove('busy'); drop.querySelector('.dmain').textContent = 'PDF 파일 선택';
