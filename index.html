@@ -207,21 +207,6 @@
   .empty{font-size:13px;color:var(--ink-faint);padding:16px 0;text-align:center;}
 
   /* review */
-  .review-toggle{margin-top:40px;width:100%;border:1.3px solid var(--line);background:#fff;border-radius:8px;
-                 padding:11px 14px;font-family:inherit;font-size:14px;font-weight:600;color:var(--ink);cursor:pointer;
-                 display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;}
-  .review-toggle:hover{border-color:var(--pine);}
-  .review-toggle .n{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--pine-dim);
-                    background:var(--pine-wash);padding:2px 7px;border-radius:5px;flex-shrink:0;}
-  .review{display:none;margin-top:14px;}
-  .review.open{display:block;}
-  .item{border-left:2px solid var(--line);padding-left:13px;margin-bottom:20px;}
-  .item.flag{border-left-color:var(--flag);}
-  .item.done{border-left-color:var(--pine);}
-  .item h3{font-size:14px;font-weight:700;margin:0 0 5px;line-height:1.45;}
-  .item p{font-size:13.5px;color:var(--ink-soft);margin:0 0 6px;line-height:1.6;}
-  .item .src{font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);line-height:1.7;}
-  .item .applied{font-size:13px;color:var(--pine-dim);background:var(--pine-wash);padding:7px 10px;border-radius:6px;margin:8px 0 0;}
 
   footer{margin-top:52px;padding-top:22px;border-top:1px solid var(--line);}
   footer p{font-size:13px;color:var(--ink-soft);line-height:1.75;margin:0 0 12px;}
@@ -302,12 +287,6 @@
   </section>
 
   <button class="reset" id="reset">입력 초기화</button>
-
-  <button class="review-toggle" id="reviewToggle" aria-expanded="false" aria-controls="review">
-    <span>적용 기준 — 확정 사항과 남은 논의</span>
-    <span class="n" id="flagCount"></span>
-  </button>
-  <div class="review" id="review"></div>
 
   <footer>
     <p>이 도구는 교과 영역만 다룹니다. Silver 이상에 필요한 비교과 15크레딧과 Gold의 현장실습 4주 요건은 포함되지 않습니다.</p>
@@ -390,7 +369,7 @@ function byName(n){ for(let i=0;i<COURSES.length;i++) if(COURSES[i].n === n) ret
    2. 상태
    ============================================================ */
 const state = {
-  rows:[], terms:[], startTerm:null, offset:null, curNom:null,
+  rows:[], terms:[], maxRank:0, startTerm:null, offset:null, curNom:null,
   done:{},    // 과목명 → {term, before}
   plan:{},    // 과목명 → true
   source:null, manual:{}, dup:{}
@@ -593,11 +572,19 @@ function ingest(rows){
   state.rows = rows; state.manual = {}; state.dup = {};
   state.done = {}; state.plan = {};
 
+  /* 여름 · 겨울은 계절학기이므로 이수 학기 수와 학년 산정에서 뺀다.
+     계절학기에 이수한 과목의 학점은 그대로 인정한다. */
   const seen = {};
-  rows.forEach(function(r){ seen[r.year + '-' + r.sem] = true; });
+  let maxRank = 0;
+  rows.forEach(function(r){
+    const rk = rowRank(r);
+    if(rk > maxRank) maxRank = rk;
+    if(semRank(r.sem) === 1 || semRank(r.sem) === 2) seen[r.year + '-' + r.sem] = true;
+  });
+  state.maxRank = maxRank;
   state.terms = Object.keys(seen).map(function(key){
-    const p = key.split('-');
-    return {key:key, year:+p[0], sem:p[1], rank:absIdx(+p[0], p[1]) * 10 + semRank(p[1])};
+    const q = key.split('-');
+    return {key:key, year:+q[0], sem:q[1], rank:absIdx(+q[0], q[1]) * 10 + semRank(q[1])};
   }).sort(function(a,b){ return a.rank - b.rank; });
 
   state.startTerm = 'NEXT';
@@ -662,11 +649,10 @@ function inferOffset(){
 }
 
 function termRank(key){
-  if(key === 'NEXT'){
-    return state.terms.length ? state.terms[state.terms.length - 1].rank + 1 : 1;
-  }
-  for(let i = 0; i < state.terms.length; i++) if(state.terms[i].key === key) return state.terms[i].rank;
-  return 0;
+  if(key === 'NEXT') return (state.maxRank || 0) + 1;
+  const q = String(key).split('-');
+  if(q.length < 2) return 0;
+  return absIdx(+q[0], q[1]) * 10 + semRank(q[1]);
 }
 function applySplit(){
   const s = state.startTerm ? termRank(state.startTerm) : 0;
@@ -905,7 +891,7 @@ function renderImport(err, showPaste){
   });
   h += '<button type="button" class="chip plain' + (state.startTerm === 'NEXT' ? ' on' : '') +
        '" data-term="NEXT">다음 학기부터</button>';
-  h += '</div><p class="hint">참여를 시작한 학기를 누르면 그 학기부터 참여 후로 처리합니다. 지금 등록하는 경우가 기본값입니다. 참여 전 GR기초는 6학점까지 소급되고 GR심화는 소급되지 않습니다.' +
+  h += '</div><p class="hint">정규학기만 표시합니다. 여름 · 겨울 계절학기는 학기 수에 넣지 않지만 그때 이수한 과목의 학점은 인정됩니다. 참여를 시작한 학기를 누르면 그 학기부터 참여 후로 처리합니다. 지금 등록하는 경우가 기본값입니다. 참여 전 GR기초는 6학점까지 소급되고 GR심화는 소급되지 않습니다.' +
        (state.offset === null ? ' 학년은 특성화 교과목 이수 기록이 있어야 추정됩니다.' : '') + '</p></div>';
 
   /* 행별 인식 결과 확인 */
@@ -1022,7 +1008,7 @@ document.addEventListener('keydown', function(e){
 });
 
 document.getElementById('reset').addEventListener('click', function(){
-  state.rows = []; state.terms = []; state.startTerm = null;
+  state.rows = []; state.terms = []; state.maxRank = 0; state.startTerm = null;
   state.offset = null; state.curNom = null; state.done = {}; state.plan = {};
   state.source = null; state.manual = {}; state.dup = {};
   fileInput.value = '';
@@ -1043,84 +1029,9 @@ window.addEventListener('scroll', function(){
 }, {passive:true});
 
 /* ============================================================
-   8. 기준 검토
-   ============================================================ */
-const REVIEW = [
-  {ok:true, h:'계열 전용 과목도 교차 이수 가능',
-   p:'이수체계도의 건축학 · 공통 · 건축공학 구분은 편성 표기이며 수강 제약이 아닙니다. GR기초와 GR심화 모두 전공과 무관하게 이수할 수 있습니다.',
-   src:'사업단 확정',
-   applied:'경로에 전 과목을 표시하고 전공 선택 입력을 없앴습니다. 계열은 왼쪽 색 막대로만 구분해 표시합니다.'},
-
-  {ok:true, h:'학점은 정규 학점과 동일하게 산정',
-   p:'이수체계도에 표기된 학점을 그대로 인정합니다. 건축기초설계2와 건축설계(1)(2)는 4학점, 건축설계(5)는 6학점입니다. 사업계획서의 3학점 균일 산정 규정은 사유서 수정으로 대체되었습니다.',
-   src:'사업단 확정 · 사유서 수정분',
-   applied:'체계도 표기 학점으로 계산합니다.'},
-
-  {ok:true, h:'특성화 필수 교과목은 두 과목 중 1과목',
-   p:'「그린리모델링」 또는 「건축시스템설계」 중 1과목 이상을 이수해야 합니다.',
-   src:'사업단 확정',
-   applied:'두 과목 중 하나라도 이수 또는 수강 예정으로 담기면 충족으로 판정합니다.'},
-
-  {ok:true, h:'Green 단계 = 교과 24학점',
-   p:'GR기초 최대 9학점과 GR심화 15학점 이상을 합해 24학점입니다. 브리핑과 상세안내서의 심화 15학점 표기는 하위 조건으로 함께 검사합니다.',
-   src:'사업단 확정',
-   applied:'합계 24학점, GR심화 15학점, 필수 교과목 1과목을 모두 만족해야 충족으로 판정합니다.'},
-
-  {ok:true, h:'GR심화는 소급 인정 없음',
-   p:'참여 전에 이수한 GR심화 교과목은 예외 없이 인정되지 않습니다. GR기초는 참여 전 이수분을 6학점까지 소급합니다.',
-   src:'사업단 확정',
-   applied:'참여 전 GR심화 과목은 목록에 표시하되 학점에서 제외하고 판정문에 과목명을 적습니다.'},
-
-  {ok:true, h:'참여 자격은 건축학부 재학생',
-   p:'학년 조건은 없습니다.',
-   src:'사업단 확정',
-   applied:'학년은 판정에 쓰지 않고, 남은 학기를 계산하기 위한 참고값으로만 추정합니다.'},
-
-  {ok:true, h:'GR심화 교과목 구성은 이수체계도 기준',
-   p:'사업계획서 분류표에 있던 건축디지털트윈과 친환경통합시스템이 빠지고 구조시스템설계와 건설관리의 이해가 들어왔습니다. 교과목명은 건물성능분석, 건축설계(1)(2)(5)로 통일합니다.',
-   src:'최신 이수체계도 · 학생 배포자료 수정 완료',
-   applied:'체계도의 교과목과 학년-학기 배치를 그대로 옮겼습니다. 옛 이름인 건물에너지분석도 같은 과목으로 인식합니다.'},
-
-  {ok:true, h:'탄소중립 관련 주제 수행 과목',
-   p:'「건축시스템설계」와 「건축연구」는 학점으로 산정하되, 탄소중립 관련 주제를 수행한 경우 검토 후 반영합니다.',
-   src:'사업단 확정',
-   applied:'두 과목을 이수 학점에 포함하고, 경로 화면의 과목 설명에 검토 대상임을 표기합니다.'},
-
-  {h:'현장실습은 이 도구에서 제외',
-   p:'표준현장실습은 단기집중형 2~3학점, 정규학기 몰입형 12~15학점으로 폭이 있고 정규학기 몰입형은 비교과 크레딧으로도 동시에 인정됩니다. 산정 방식이 정해지지 않아 우선 제외했습니다.',
-   src:'이수체계도 현장실습 / 추후 논의',
-   applied:'경로와 학점 계산 모두에서 뺐습니다. 실제로는 현장실습으로 부족분을 메우는 경로가 있을 수 있습니다.'},
-
-  {h:'비교과 영역은 추후 논의',
-   p:'이 도구는 교과 24학점만 다룹니다. Silver 이상에 필요한 비교과 15크레딧과 유형별 적립 상한은 별도 검토 대상입니다.',
-   src:'추후 논의',
-   applied:'비교과는 계산에 포함하지 않습니다.'}
-];
-
-function renderReview(){
-  let h = '';
-  REVIEW.forEach(function(it){
-    h += '<div class="item' + (it.ok ? ' done' : ' flag') + '">' +
-         '<h3>' + it.h + '</h3><p>' + it.p + '</p>' +
-         '<p class="src">' + it.src + '</p>' +
-         (it.applied ? '<p class="applied">' + it.applied + '</p>' : '') + '</div>';
-  });
-  document.getElementById('review').innerHTML = h;
-  const nOk = REVIEW.filter(function(i){ return i.ok; }).length;
-  document.getElementById('flagCount').textContent =
-    '확정 ' + nOk + '건 · 논의 ' + (REVIEW.length - nOk) + '건';
-}
-
-document.getElementById('reviewToggle').addEventListener('click', function(){
-  const open = document.getElementById('review').classList.toggle('open');
-  this.setAttribute('aria-expanded', open ? 'true' : 'false');
-});
-
-/* ============================================================
    9. 초기화
    ============================================================ */
 if(window.pdfjsLib) window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_BASE + 'build/pdf.worker.min.js';
-renderReview();
 paint();
 </script>
 </body>
