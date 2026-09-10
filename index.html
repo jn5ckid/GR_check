@@ -35,23 +35,25 @@
 
   /* status */
   .status{position:sticky;top:0;z-index:10;background:var(--paper);padding:14px 0 12px;border-bottom:1px solid var(--line);}
-  .gauge{border:1.3px solid var(--line);border-radius:8px;padding:10px 13px 12px;}
+  .gauge{border:1.5px solid #CBE0DA;border-radius:9px;padding:12px 15px 14px;background:var(--pine-wash);}
   .gauge.met{border-color:var(--pine);}
   .gtop{display:flex;align-items:baseline;justify-content:space-between;gap:10px;}
-  .gtop .glabel{font-size:11.5px;color:var(--ink-faint);}
-  .gtop .gstage{font-size:12px;font-weight:700;color:var(--ink-faint);font-family:var(--mono);}
-  .gauge.met .gstage{color:var(--pine-dim);}
-  .gval{font-family:var(--mono);font-size:22px;font-weight:600;letter-spacing:-.02em;line-height:1.2;margin-top:1px;}
-  .gval .goal{font-size:14px;color:var(--ink-faint);font-weight:400;}
-  .gauge.met .gval{color:var(--pine-dim);}
+  .gtop .glabel{font-size:12px;font-weight:600;color:var(--pine-dim);}
+  .gtop .gstage{font-size:13px;font-weight:700;color:var(--pine-dim);font-family:var(--mono);letter-spacing:-.01em;}
+  .gval{font-family:var(--mono);font-size:31px;font-weight:700;letter-spacing:-.03em;line-height:1.15;
+        margin-top:2px;color:var(--pine-dim);}
+  .gval .goal{font-size:17px;color:#7FA79E;font-weight:500;}
+  .bar{height:5px;background:#DCE9E5;border-radius:3px;margin-top:9px;overflow:hidden;display:flex;}
   .bar{height:4px;background:var(--line-soft);border-radius:2px;margin-top:8px;overflow:hidden;display:flex;}
   .bar i{display:block;height:100%;width:0;transition:width .2s ease;}
   .bar i.done{background:var(--pine);}
   .bar i.plan{background:#9CC8BE;}
-  .gsub{display:flex;gap:14px;margin-top:8px;font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);flex-wrap:wrap;}
-  .gsub b{font-weight:600;color:var(--ink-soft);}
+  .gsub{display:flex;gap:15px;margin-top:9px;font-family:var(--mono);font-size:12px;color:#6E8C85;flex-wrap:wrap;}
+  .gsub b{font-weight:700;color:var(--pine-dim);}
   .status.compact{padding:8px 0;}
-  .status.compact .gval{font-size:16px;}
+  .status.compact .gauge{padding:8px 13px 10px;}
+  .status.compact .gval{font-size:20px;}
+  .status.compact .gval .goal{font-size:13px;}
   .status.compact .bar{margin-top:6px;}
   .status.compact .gsub{display:none;}
   section{margin-top:34px;scroll-margin-top:130px;}
@@ -176,10 +178,17 @@
 
   /* path */
   .term-block{margin-bottom:20px;}
-  .term-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
-             padding-bottom:5px;border-bottom:1px solid var(--line);margin-bottom:4px;}
-  .term-head .tname{font-size:13px;font-weight:700;}
-  .term-head .tmeta{font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);}
+  .term-head{width:100%;display:flex;align-items:baseline;gap:8px;
+             padding:6px 2px 6px 0;border:none;background:none;border-bottom:1px solid var(--line);
+             margin-bottom:4px;cursor:pointer;font-family:inherit;text-align:left;}
+  .term-head .tarrow{font-size:10px;color:var(--ink-faint);flex-shrink:0;
+                     transition:transform .15s ease;display:inline-block;}
+  .term-block.open .term-head .tarrow{transform:rotate(90deg);}
+  .term-head .tname{font-size:13px;font-weight:700;flex:1;}
+  .term-head:hover .tname{color:var(--pine-dim);}
+  .term-head .tmeta{font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);flex-shrink:0;}
+  .term-body{display:none;}
+  .term-block.open .term-body{display:block;}
   .cw{display:flex;align-items:center;gap:10px;padding:7px 2px 7px 11px;border-bottom:1px solid var(--line-soft);
       border-left:3px solid var(--line);cursor:pointer;}
   .cw:last-child{border-bottom:none;}
@@ -207,7 +216,9 @@
   .gate{display:flex;gap:8px;font-size:13px;padding:9px 11px;border-radius:7px;background:#F7F7F5;
         color:var(--ink-soft);margin-top:10px;line-height:1.5;}
   .gate.met{background:var(--pine-wash);color:var(--pine-dim);}
-  .gate .gm{font-family:var(--mono);flex-shrink:0;}
+  .gate .gm{font-family:var(--mono);font-size:11.5px;flex-shrink:0;
+            background:#EDEDEA;color:var(--ink-soft);padding:1px 7px;border-radius:5px;line-height:1.5;}
+  .gate.met .gm{background:#D7E8E2;color:var(--pine-dim);}
   .empty{font-size:13px;color:var(--ink-faint);padding:16px 0;text-align:center;}
   .gated{display:none;}
   .gated.on{display:block;}
@@ -282,7 +293,7 @@
 
   <section id="secPath" class="gated">
     <h2 class="sec">이수 경로 <span class="req">이수체계도 기준</span></h2>
-    <p class="sec-note">남은 학기에 열리는 특성화 교과목입니다. 누르면 수강 예정으로 담기고 상단 학점에 반영됩니다. 1~2학년 공통 GR기초는 전부 참여 전 이수분이므로 소급 계산에만 들어갑니다.</p>
+    <p class="sec-note">남은 학기에 열리는 특성화 교과목입니다. 누르면 수강 예정으로 담기고 상단 학점에 반영됩니다. 1~2학년 공통 GR기초는 26-1 이전 이수분이므로 소급 계산에만 들어갑니다.</p>
     <div class="legend">
       <span><i style="background:var(--arch)"></i>건축학 전공</span>
       <span><i style="background:var(--common)"></i>공통</span>
@@ -375,7 +386,7 @@ function byName(n){ for(let i=0;i<COURSES.length;i++) if(COURSES[i].n === n) ret
    2. 상태
    ============================================================ */
 const state = {
-  rows:[], terms:[], maxRank:0, offset:null, curNom:null,
+  rows:[], terms:[], maxRank:0, offset:null, curNom:null, tOpen:{},
   done:{},    // 과목명 → {term, before}
   plan:{},    // 과목명 → true
   source:null, manual:{}, dup:{}
@@ -855,10 +866,16 @@ function renderPath(){
     if(!list.length) return;
     let sum = 0;
     list.forEach(function(c){ if(state.done[c.n] || state.plan[c.n]) sum += crOf(c); });
-    h += '<div class="term-block"><div class="term-head"><span class="tname">' + TERM_LABEL[t] +
-         '</span><span class="tmeta">' + (sum ? sum + '학점' : '') + '</span></div>';
+    const pickable = list.filter(function(c){ return selectable(c); }).length;
+    if(state.tOpen[t] === undefined) state.tOpen[t] = pickable > 0;
+    h += '<div class="term-block' + (state.tOpen[t] ? ' open' : '') + '">' +
+         '<button type="button" class="term-head" data-tblock="' + t + '">' +
+         '<span class="tarrow">▶</span><span class="tname">' + TERM_LABEL[t] + '</span>' +
+         '<span class="tmeta">' + (sum ? sum + '학점 · ' : '') +
+         (pickable ? '담을 수 있는 ' + pickable + '과목' : '남은 과목 없음') + '</span></button>' +
+         '<div class="term-body">';
     list.forEach(function(c){ h += courseRow(c); });
-    h += '</div>';
+    h += '</div></div>';
   });
   h += '<p class="hint">계열 전용 과목도 교차 이수할 수 있어 전공과 무관하게 모두 담을 수 있습니다. 이수체계도상 5학년에는 특성화 교과목이 없습니다.</p>';
   el.innerHTML = h;
@@ -1033,6 +1050,8 @@ document.addEventListener('change', function(e){
 });
 
 document.addEventListener('click', function(e){
+  const tb = e.target.closest ? e.target.closest('[data-tblock]') : null;
+  if(tb){ const k = tb.getAttribute('data-tblock'); state.tOpen[k] = !state.tOpen[k]; renderPath(); return; }
   const pk = e.target.closest ? e.target.closest('[data-pick]') : null;
   if(pk) pick(pk.getAttribute('data-pick'));
 });
@@ -1043,7 +1062,7 @@ document.addEventListener('keydown', function(e){
 });
 
 document.getElementById('reset').addEventListener('click', function(){
-  state.rows = []; state.terms = []; state.maxRank = 0;
+  state.rows = []; state.terms = []; state.maxRank = 0; state.tOpen = {};
   state.offset = null; state.curNom = null; state.done = {}; state.plan = {};
   state.source = null; state.manual = {}; state.dup = {};
   fileInput.value = '';
