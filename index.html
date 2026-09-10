@@ -137,6 +137,10 @@
   .chip .n{color:var(--ink-faint);font-size:10.5px;margin-left:4px;}
   .chip.on .n{color:var(--pine);}
   .chip.plain{font-family:inherit;font-size:13px;padding:5px 12px;}
+  .chip.flat{cursor:default;}
+  .chip.flat:hover{border-color:var(--line);}
+  .chip.flat.on:hover{border-color:var(--pine);}
+  .trow .tk .cut{font-family:var(--mono);font-size:11px;color:var(--ink-faint);margin-left:5px;}
   .hint{font-size:12.5px;color:var(--ink-faint);margin-top:7px;line-height:1.55;}
 
   .maybe{border:1.3px solid var(--flag);background:var(--flag-wash);border-radius:8px;padding:12px 13px;margin-top:16px;}
@@ -270,7 +274,7 @@
 
   <section id="secTally" class="gated">
     <h2 class="sec">이수 현황 <span class="req">GR기초 ≤9 + GR심화 ≥15</span></h2>
-    <p class="sec-note">GR기초 교과목은 최대 9학점까지 인정되고, 그중 참여 전 이수분은 6학점까지만 소급됩니다. GR심화 교과목은 소급되지 않으므로 참여 전 이수분은 인정에서 빠집니다.</p>
+    <p class="sec-note">2026학년도 1학기까지 이수한 과목이 소급 대상입니다. GR기초는 최대 9학점까지 인정되고 그중 소급분은 6학점까지만 들어갑니다. GR심화는 소급되지 않으므로 소급 대상 과목은 인정에서 빠집니다. 2026학년도 2학기부터 이수한 과목은 그대로 인정됩니다.</p>
     <div class="tally" id="tally"></div>
     <div class="routes" id="routes"></div>
     <div class="gate" id="gateMust"></div>
@@ -371,7 +375,7 @@ function byName(n){ for(let i=0;i<COURSES.length;i++) if(COURSES[i].n === n) ret
    2. 상태
    ============================================================ */
 const state = {
-  rows:[], terms:[], maxRank:0, startTerm:null, offset:null, curNom:null,
+  rows:[], terms:[], maxRank:0, offset:null, curNom:null,
   done:{},    // 과목명 → {term, before}
   plan:{},    // 과목명 → true
   source:null, manual:{}, dup:{}
@@ -628,7 +632,6 @@ function ingest(rows){
     return {key:key, year:+q[0], sem:q[1], rank:absIdx(+q[0], q[1]) * 10 + semRank(q[1])};
   }).sort(function(a,b){ return a.rank - b.rank; });
 
-  state.startTerm = 'NEXT';
 
   rebuildDone();
   inferOffset();
@@ -676,16 +679,19 @@ function inferOffset(){
 }
 function nomOf(i){ return {y:Math.floor(i / 2) + 1, t:i % 2 + 1}; }
 
+/* 소급 기준선 — 2026학년도 1학기까지 이수한 과목이 소급 대상,
+   2026학년도 2학기부터는 그대로 인정한다. */
+const CUTOFF = '2026-2';
+
 function termRank(key){
-  if(key === 'NEXT') return (state.maxRank || 0) + 1;
   const q = String(key).split('-');
   if(q.length < 2) return 0;
   return absIdx(+q[0], q[1]) * 10 + semRank(q[1]);
 }
 function applySplit(){
-  const s = state.startTerm ? termRank(state.startTerm) : 0;
+  const cut = termRank(CUTOFF);
   Object.keys(state.done).forEach(function(n){
-    state.done[n].before = termRank(state.done[n].term) < s;
+    state.done[n].before = termRank(state.done[n].term) < cut;
   });
 }
 
@@ -785,7 +791,7 @@ function paint(){
     if(r.advAll < 15) gaps.push('GR심화 <b>' + (15 - r.advAll) + '학점</b> 부족');
     if(r.totalAll < 24) gaps.push('합계 <b>' + (24 - r.totalAll) + '학점</b> 부족');
     if(!r.mustHit.length) gaps.push('필수 교과목 미확보 — <b>「그린리모델링」 또는 「건축시스템설계」</b> 중 1과목');
-    if(r.aBefore.length) gaps.push('참여 전 이수한 GR심화 <b>' + r.aBefore.length + '과목</b>은 소급 불인정 — ' + r.aBefore.join(', '));
+    if(r.aBefore.length) gaps.push('26-1까지 이수한 GR심화 <b>' + r.aBefore.length + '과목</b>은 소급 불인정 — ' + r.aBefore.join(', '));
     if(r.basicWaste > 0) gaps.push('GR기초 <b>' + r.basicWaste + '학점</b>은 9학점 한도를 넘어 인정되지 않습니다');
     if(!r.feasible){
       v.className = 'verdict no';
@@ -795,7 +801,7 @@ function paint(){
       if(!r.mustPossible) why.push('필수 교과목이 남은 학기에 없음');
       v.innerHTML = '<h2>현재 조건으로는 24학점을 채울 수 없습니다</h2><ul>' +
         why.map(function(x){ return '<li>' + x + '</li>'; }).join('') +
-        '</ul><p class="note">참여 시작 학기를 앞당기면 결과가 달라질 수 있습니다. 사업단 확인이 필요한 사항입니다.</p>';
+        '</ul><p class="note">2026학년도 2학기부터 이수하는 과목만 GR심화로 인정됩니다.</p>';
     }else{
       v.innerHTML = '<h2>남은 요건</h2><ul>' + gaps.map(function(g){ return '<li>' + g + '</li>'; }).join('') +
         '</ul><p class="note">남은 과목을 모두 담으면 최대 ' + r.ceilTotal + '학점(GR심화 ' + r.ceilAdv + ')까지 가능합니다.</p>';
@@ -820,9 +826,9 @@ function paint(){
 function renderTally(r){
   const el = document.getElementById('tally');
   let h = '';
-  h += row('참여 전 GR기초 소급', '이수 ' + r.bBefore + '학점 중 6학점 한도', r.carry);
-  h += row('참여 후 GR기초', '한도 9학점까지, 잔여 ' + Math.max(0, 9 - r.carry) + '학점', r.bAfter + r.bPlan);
-  h += row('GR심화', r.aBefore.length ? '참여 전 ' + r.aBefore.length + '과목은 소급 불인정' : '소급 인정 없음', r.advAll);
+  h += row('소급 GR기초 <span class="cut">26-1까지</span>', '이수 ' + r.bBefore + '학점 중 6학점 한도', r.carry);
+  h += row('GR기초 <span class="cut">26-2부터</span>', '한도 9학점까지, 잔여 ' + Math.max(0, 9 - r.carry) + '학점', r.bAfter + r.bPlan);
+  h += row('GR심화', r.aBefore.length ? '26-1까지 이수한 ' + r.aBefore.length + '과목은 소급 불인정' : '소급 인정 없음', r.advAll);
   h += '<div class="trow sum"><span class="tk">인정 합계</span><span class="tv">' + r.totalAll + ' / 24</span></div>';
   el.innerHTML = h;
 
@@ -863,7 +869,7 @@ function courseRow(c){
   const planned = !!state.plan[c.n];
   let cls = 'cw tr-' + c.track, st = '담기', lock = false;
   if(d){
-    if(c.gr === '심화' && d.before){ cls += ' done warn'; st = '소급 불인정'; }
+    if(c.gr === '심화' && d.before){ cls += ' done warn'; st = '26-1 이전'; }
     else { cls += ' done'; st = '이수 ' + d.term; }
     lock = true;
   }else if(passedTerm(c)){ cls += ' locked'; st = '지난 학기'; lock = true; }
@@ -912,19 +918,17 @@ function renderImport(err, showPaste){
     '<div><div class="k">GR심화 이수</div><div class="v">' + na + '</div></div>' +
     '</div>';
 
-  h += '<div class="field"><div class="fhead"><span class="fname">이수 학기 · 참여 시작 학기 지정</span>' +
+  h += '<div class="field"><div class="fhead"><span class="fname">이수 학기</span>' +
        '<span class="fval">' + (state.curNom !== null
          ? state.terms.length + '개 학기 이수 · ' + nomOf(state.curNom).y + '학년 ' + nomOf(state.curNom).t + '학기'
          : '학기 없음') + '</span></div><div class="chips">';
+  const cut = termRank(CUTOFF);
   state.terms.forEach(function(t, i){
-    const after = state.startTerm && t.rank >= termRank(state.startTerm);
     const g = nomOf(i);
-    h += '<button type="button" class="chip' + (after ? ' on' : '') + '" data-term="' + t.key + '">' +
-         t.year + '-' + t.sem + '<span class="n">' + g.y + '-' + g.t + '</span></button>';
+    h += '<span class="chip flat' + (t.rank >= cut ? ' on' : '') + '">' +
+         t.year + '-' + t.sem + '<span class="n">' + g.y + '-' + g.t + '</span></span>';
   });
-  h += '<button type="button" class="chip plain' + (state.startTerm === 'NEXT' ? ' on' : '') +
-       '" data-term="NEXT">다음 학기부터</button>';
-  h += '</div><p class="hint">정규학기만 세어 두 학기를 한 학년으로 봅니다. 칩 오른쪽의 작은 숫자가 학년-학기입니다. 여름 · 겨울 계절학기는 학기 수에 넣지 않지만 그때 이수한 과목의 학점은 인정됩니다. 참여를 시작한 학기를 누르면 그 학기부터 참여 후로 처리합니다. 지금 등록하는 경우가 기본값입니다. 참여 전 GR기초는 6학점까지 소급되고 GR심화는 소급되지 않습니다.' +
+  h += '</div><p class="hint">정규학기만 세어 두 학기를 한 학년으로 봅니다. 오른쪽의 작은 숫자가 학년-학기이고, 진하게 표시된 학기가 2026학년도 2학기 이후입니다. 여름 · 겨울 계절학기는 학기 수에 넣지 않지만 그때 이수한 과목의 학점은 인정됩니다.' +
        (state.offset === null ? '' : '') + '</p></div>';
 
   /* 행별 인식 결과 확인 */
@@ -1029,8 +1033,6 @@ document.addEventListener('change', function(e){
 });
 
 document.addEventListener('click', function(e){
-  const t = e.target.closest ? e.target.closest('[data-term]') : null;
-  if(t){ state.startTerm = t.getAttribute('data-term'); applySplit(); renderImport(null); paint(); return; }
   const pk = e.target.closest ? e.target.closest('[data-pick]') : null;
   if(pk) pick(pk.getAttribute('data-pick'));
 });
@@ -1041,7 +1043,7 @@ document.addEventListener('keydown', function(e){
 });
 
 document.getElementById('reset').addEventListener('click', function(){
-  state.rows = []; state.terms = []; state.maxRank = 0; state.startTerm = null;
+  state.rows = []; state.terms = []; state.maxRank = 0;
   state.offset = null; state.curNom = null; state.done = {}; state.plan = {};
   state.source = null; state.manual = {}; state.dup = {};
   fileInput.value = '';
