@@ -14,6 +14,8 @@
     --line:#DEDEDA; --line-soft:#EDEDEA;
     --pine:#087263; --pine-dim:#065A4F; --pine-wash:#F0F6F4;
     --flag:#9A5B00; --flag-wash:#FBF5EC;
+    --amber:#A8760B; --amber-wash:#FDF7EA; --amber-line:#E3CE9E;
+    --gray-wash:#F5F5F2;
     --arch:#A4413C; --common:#C07A28; --eng:#2E5E96; --field:#2F6B4F;
     --mono: ui-monospace,'SF Mono','Menlo','Consolas',monospace;
   }
@@ -35,21 +37,40 @@
 
   /* status */
   .status{position:sticky;top:0;z-index:10;background:var(--paper);padding:14px 0 12px;border-bottom:1px solid var(--line);}
-  .gauge{border:1.5px solid #CBE0DA;border-radius:9px;padding:12px 15px 14px;background:var(--pine-wash);}
-  .gauge.met{border-color:var(--pine);}
+  /* 기본 회색 → 판독 후 노랑 → 요건 충족 초록 */
+  .gauge{border:1.5px solid var(--line);border-radius:9px;padding:12px 15px 14px;background:var(--gray-wash);
+         transition:background .2s ease,border-color .2s ease;}
   .gtop{display:flex;align-items:baseline;justify-content:space-between;gap:10px;}
-  .gtop .glabel{font-size:12px;font-weight:600;color:var(--pine-dim);}
-  .gtop .gstage{font-size:13px;font-weight:700;color:var(--pine-dim);font-family:var(--mono);letter-spacing:-.01em;}
+  .gtop .glabel{font-size:12px;font-weight:600;color:var(--ink-faint);}
+  .gtop .gstage{font-size:13px;font-weight:700;color:var(--ink-faint);font-family:var(--mono);letter-spacing:-.01em;}
   .gval{font-family:var(--mono);font-size:31px;font-weight:700;letter-spacing:-.03em;line-height:1.15;
-        margin-top:2px;color:var(--pine-dim);}
-  .gval .goal{font-size:17px;color:#7FA79E;font-weight:500;}
-  .bar{height:5px;background:#DCE9E5;border-radius:3px;margin-top:9px;overflow:hidden;display:flex;}
+        margin-top:2px;color:var(--ink-soft);}
+  .gval .goal{font-size:17px;color:var(--ink-faint);font-weight:500;}
+  .bar{height:5px;background:#E4E4E0;border-radius:3px;margin-top:9px;overflow:hidden;display:flex;}
+
+  .gauge.prog{border-color:var(--amber-line);background:var(--amber-wash);}
+  .gauge.prog .gtop .glabel,.gauge.prog .gtop .gstage,.gauge.prog .gval{color:var(--amber);}
+  .gauge.prog .gval .goal{color:#B99C63;}
+  .gauge.prog .bar{background:#F0E3C6;}
+  .gauge.prog .bar i.done{background:var(--amber);}
+  .gauge.prog .bar i.plan{background:#DCBE7C;}
+  .gauge.prog .gsub{color:#96793E;}
+  .gauge.prog .gsub b{color:var(--amber);}
+
+  .gauge.met{border-color:var(--pine);background:var(--pine-wash);}
+  .gauge.met .gtop .glabel,.gauge.met .gtop .gstage,.gauge.met .gval{color:var(--pine-dim);}
+  .gauge.met .gval .goal{color:#7FA79E;}
+  .gauge.met .bar{background:#DCE9E5;}
+  .gauge.met .bar i.done{background:var(--pine);}
+  .gauge.met .bar i.plan{background:#9CC8BE;}
+  .gauge.met .gsub{color:#6E8C85;}
+  .gauge.met .gsub b{color:var(--pine-dim);}
   .bar{height:4px;background:var(--line-soft);border-radius:2px;margin-top:8px;overflow:hidden;display:flex;}
   .bar i{display:block;height:100%;width:0;transition:width .2s ease;}
-  .bar i.done{background:var(--pine);}
-  .bar i.plan{background:#9CC8BE;}
-  .gsub{display:flex;gap:15px;margin-top:9px;font-family:var(--mono);font-size:12px;color:#6E8C85;flex-wrap:wrap;}
-  .gsub b{font-weight:700;color:var(--pine-dim);}
+  .bar i.done{background:var(--ink-faint);}
+  .bar i.plan{background:#C6C6C0;}
+  .gsub{display:flex;gap:15px;margin-top:9px;font-family:var(--mono);font-size:12px;color:var(--ink-faint);flex-wrap:wrap;}
+  .gsub b{font-weight:700;color:var(--ink-soft);}
   .status.compact{padding:8px 0;}
   .status.compact .gauge{padding:8px 13px 10px;}
   .status.compact .gval{font-size:20px;}
@@ -171,11 +192,12 @@
   .trow.sum{background:#F7F7F5;}
   .trow.dim .tk,.trow.dim .tv{color:var(--ink-faint);}
   .routes{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;}
-  .route{border:1.3px solid var(--line);border-radius:8px;padding:10px 12px 12px;}
-  .route.on{border-color:var(--pine);background:var(--pine-wash);}
-  .route .rname{font-size:12.5px;font-weight:700;}
-  .route.on .rname{color:var(--pine-dim);}
-  .route .rbody{font-family:var(--mono);font-size:12px;color:var(--ink-soft);margin-top:4px;line-height:1.6;}
+  .route{border:1.3px solid var(--line);border-radius:8px;padding:10px 12px 12px;background:var(--gray-wash);}
+  .route.on{border:1.6px solid var(--ink);}
+  .route .rname{font-size:12.5px;font-weight:700;color:var(--ink-faint);}
+  .route.on .rname{color:var(--ink);}
+  .route .rbody{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:4px;line-height:1.6;}
+  .route.on .rbody{color:var(--ink-soft);}
 
   /* path */
   .term-block{margin-bottom:20px;}
@@ -201,11 +223,16 @@
   .cw .cm{font-family:var(--mono);font-size:11px;color:var(--ink-faint);line-height:1.5;display:block;margin-top:1px;}
   .cw .cs{font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:5px;flex-shrink:0;
           background:#F4F4F1;color:var(--ink-faint);}
-  .cw.done .cs{background:var(--pine);color:#fff;}
+  .cw.done .cs{background:var(--amber);color:#fff;}
   .cw.done .cn{font-weight:600;}
-  .cw.planned{background:var(--pine-wash);}
-  .cw.planned .cs{background:var(--pine-wash);color:var(--pine-dim);border:1px solid var(--pine);}
-  .cw.planned .cn{font-weight:600;color:var(--pine-dim);}
+  .cw.planned{background:var(--amber-wash);}
+  .cw.planned .cs{background:var(--amber-wash);color:var(--amber);border:1px solid var(--amber-line);}
+  .cw.planned .cn{font-weight:600;color:var(--amber);}
+  /* 24학점을 채우면 초록으로 */
+  .fulfilled .cw.done .cs{background:var(--pine);}
+  .fulfilled .cw.planned{background:var(--pine-wash);}
+  .fulfilled .cw.planned .cs{background:var(--pine-wash);color:var(--pine-dim);border-color:var(--pine);}
+  .fulfilled .cw.planned .cn{color:var(--pine-dim);}
   .cw.locked{cursor:default;opacity:.45;}
   .cw.locked .cn{font-weight:400;}
   .cw.warn .cs{background:var(--flag-wash);color:var(--flag);}
@@ -790,7 +817,10 @@ function paint(){
   document.getElementById('sDone').textContent = r.totalDone;
   document.getElementById('sPlan').textContent = r.totalAll - r.totalDone;
   document.getElementById('sNeed').textContent = Math.max(0, 24 - r.totalAll);
-  document.getElementById('gauge').classList.toggle('met', r.ok);
+  const gEl = document.getElementById('gauge');
+  gEl.classList.toggle('prog', !!ready && !r.ok);
+  gEl.classList.toggle('met', r.ok);
+  document.body.classList.toggle('fulfilled', r.ok);
 
   /* 판정 */
   const v = document.getElementById('verdict');
