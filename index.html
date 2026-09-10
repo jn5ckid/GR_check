@@ -205,6 +205,8 @@
   .gate.met{background:var(--pine-wash);color:var(--pine-dim);}
   .gate .gm{font-family:var(--mono);flex-shrink:0;}
   .empty{font-size:13px;color:var(--ink-faint);padding:16px 0;text-align:center;}
+  .gated{display:none;}
+  .gated.on{display:block;}
 
   /* review */
 
@@ -266,7 +268,7 @@
     <div id="importResult"></div>
   </section>
 
-  <section id="secTally">
+  <section id="secTally" class="gated">
     <h2 class="sec">이수 현황 <span class="req">GR기초 ≤9 + GR심화 ≥15</span></h2>
     <p class="sec-note">GR기초 교과목은 최대 9학점까지 인정되고, 그중 참여 전 이수분은 6학점까지만 소급됩니다. GR심화 교과목은 소급되지 않으므로 참여 전 이수분은 인정에서 빠집니다.</p>
     <div class="tally" id="tally"></div>
@@ -274,7 +276,7 @@
     <div class="gate" id="gateMust"></div>
   </section>
 
-  <section id="secPath">
+  <section id="secPath" class="gated">
     <h2 class="sec">이수 경로 <span class="req">이수체계도 기준</span></h2>
     <p class="sec-note">남은 학기에 열리는 특성화 교과목입니다. 누르면 수강 예정으로 담기고 상단 학점에 반영됩니다. 1~2학년 공통 GR기초는 전부 참여 전 이수분이므로 소급 계산에만 들어갑니다.</p>
     <div class="legend">
@@ -286,7 +288,7 @@
     <div id="path"></div>
   </section>
 
-  <button class="reset" id="reset">입력 초기화</button>
+  <button class="reset gated" id="reset">입력 초기화</button>
 
   <footer>
     <p>이 도구는 교과 영역만 다룹니다. Silver 이상에 필요한 비교과 15크레딧과 Gold의 현장실습 4주 요건은 포함되지 않습니다.</p>
@@ -409,6 +411,8 @@ function parseStream(tk){
   const out = [];
   for(let i = 0; i < tk.length - 4; i++){
     if(!/^(19|20)\d{2}$/.test(tk[i])) continue;
+    const yr = +tk[i];
+    if(yr < 2000 || yr > 2035) continue;   /* 판독 오류로 생기는 엉뚱한 연도 차단 */
     const sem = normSem(tk[i+1]);
     if(!sem) continue;
     let ci = -1;
@@ -444,7 +448,7 @@ function parseStream(tk){
     }
     name = name.replace(/^[-–—·.]+/, '').trim();
     if(!name) continue;
-    out.push({year:+tk[i], sem:sem, name:name, credit:credit,
+    out.push({year:yr, sem:sem, name:name, credit:credit,
               grade:grade, score:score, passed:passed});
     i = end;
   }
@@ -533,6 +537,30 @@ async function makeWorker(note){
   }
 }
 
+/* 표 괘선을 지운다.
+   판독기가 셀 경계선을 글자로 오인해 행이 통째로 깨지는 것을 막는다.
+   가로 · 세로로 길게 이어진 어두운 줄만 지우므로 글자는 남는다. */
+function stripRules(cx, w, h){
+  const img = cx.getImageData(0, 0, w, h);
+  const d = img.data;
+  const dark = new Uint8Array(w * h);
+  for(let i = 0, q = 0; q < dark.length; i += 4, q++){
+    dark[q] = (d[i] * 0.299 + d[i+1] * 0.587 + d[i+2] * 0.114) < 128 ? 1 : 0;
+  }
+  const rowCut = w * 0.5, colCut = h * 0.5;
+  for(let y = 0; y < h; y++){
+    let n = 0; const base = y * w;
+    for(let x = 0; x < w; x++) n += dark[base + x];
+    if(n > rowCut) for(let x = 0; x < w; x++){ const i = (base + x) * 4; d[i] = d[i+1] = d[i+2] = 255; }
+  }
+  for(let x = 0; x < w; x++){
+    let n = 0;
+    for(let y = 0; y < h; y++) n += dark[y * w + x];
+    if(n > colCut) for(let y = 0; y < h; y++){ const i = (y * w + x) * 4; d[i] = d[i+1] = d[i+2] = 255; }
+  }
+  cx.putImageData(img, 0, 0);
+}
+
 async function ocrPdf(file, note){
   ocrStage = '판독 모듈 내려받기';
   note('판독 모듈 내려받는 중');
@@ -541,8 +569,9 @@ async function ocrPdf(file, note){
   ocrStage = '판독 작업자 생성';
   note('판독 준비 중');
   const worker = await makeWorker(note);
-  /* 표 형태 문서는 단일 열(psm 4)로 읽어야 행이 유지된다. 기본값(자동)은 괘선에 걸려 깨진다. */
-  await worker.setParameters({tessedit_pageseg_mode:'4'});
+  /* 괘선을 지운 뒤에는 단일 블록(psm 6)으로 읽어야 행이 유지된다.
+     자동 배치 분석에 맡기면 표의 열을 따로 읽어 행이 무너진다. */
+  await worker.setParameters({tessedit_pageseg_mode:'6'});
 
   const buf = await file.arrayBuffer();
   const doc = await window.pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise;
@@ -558,9 +587,10 @@ async function ocrPdf(file, note){
       const vp = page.getViewport({scale:scale});
       const cv = document.createElement('canvas');
       cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
-      const cx = cv.getContext('2d');
+      const cx = cv.getContext('2d', {willReadFrequently:true});
       cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height);
       await page.render({canvasContext:cx, viewport:vp}).promise;
+      stripRules(cx, cv.width, cv.height);
 
       ocrStage = p + '쪽 글자 판독';
       const out = await withTimeout(worker.recognize(cv), 180000, p + '쪽 판독');
@@ -772,6 +802,9 @@ function paint(){
     }
   }
 
+  ['secTally','secPath','reset'].forEach(function(id){
+    document.getElementById(id).classList.toggle('on', !!ready);
+  });
   renderTally(r);
   renderPath();
 
