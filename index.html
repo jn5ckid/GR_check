@@ -132,15 +132,12 @@
   .rrow .rn em{font-style:normal;font-family:var(--mono);font-size:10.5px;color:var(--pine-dim);
                background:var(--pine-wash);padding:1px 5px;border-radius:4px;margin-left:5px;}
   .rrow .rc{font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);flex-shrink:0;}
-  .rrow .rx{font-family:var(--mono);font-size:11px;color:var(--ink-faint);flex-shrink:0;width:150px;text-align:right;}
-  .rsel{font-family:inherit;font-size:12px;padding:3px 6px;border:1.3px solid var(--line);
-        border-radius:6px;background:#fff;color:var(--ink-faint);width:150px;flex-shrink:0;}
-  .rsel:focus{outline:none;border-color:var(--pine);}
-  .rrow.on .rsel{border-color:var(--pine);color:var(--pine-dim);font-weight:600;}
+  .rrow .rx{font-family:var(--mono);font-size:11px;color:var(--ink-faint);flex-shrink:0;width:88px;text-align:right;}
+  .rrow.on .rx{color:var(--pine-dim);}
   @media (max-width:560px){
     .rrow{flex-wrap:wrap;}
     .rrow .rn{flex:1 1 100%;order:-1;}
-    .rsel,.rrow .rx{width:auto;flex:1;}
+    .rrow .rx{width:auto;}
   }
   .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px;}
   .summary div{border:1.3px solid var(--line);border-radius:7px;padding:7px 9px 9px;}
@@ -234,6 +231,8 @@
   .fulfilled .cw.planned .cs{background:var(--pine-wash);color:var(--pine-dim);border-color:var(--pine);}
   .fulfilled .cw.planned .cn{color:var(--pine-dim);}
   .cw.locked{cursor:default;opacity:.45;}
+  .cw.req{cursor:default;}
+  .cw.req .cs{font-weight:700;}
   .cw.locked .cn{font-weight:400;}
   .cw.warn .cs{background:var(--flag-wash);color:var(--flag);}
   .mark{font-family:var(--mono);font-size:10.5px;color:var(--flag);margin-left:4px;}
@@ -421,7 +420,7 @@ function byName(n){ for(let i=0;i<COURSES.length;i++) if(COURSES[i].n === n) ret
    2. 상태
    ============================================================ */
 const state = {
-  rows:[], terms:[], maxRank:0, offset:null, curNom:null, tOpen:{},
+  rows:[], terms:[], maxRank:0, offset:null, curNom:null, tOpen:{}, major:'none', auto:{},
   done:{},    // 과목명 → {term, before}
   plan:{},    // 과목명 → true
   source:null, manual:{}, dup:{}
@@ -472,6 +471,9 @@ function parseStream(tk){
       return /^(19|20)\d{2}$/.test(tk[k]) && k + 1 < tk.length && normSem(tk[k+1]) !== null;
     };
     /* 1순위 — 평점 열을 기준점으로 삼는다. 학점 위치까지 함께 검증된다. */
+    /* 판독 과정에서 분반이 코드에서 떨어져 나오면 과목명에 섞인다 — 분리해 낸다. */
+    if(tk[ci].indexOf('-') < 0 && ci + 2 < tk.length && /^[0-9A-Z]{1,3}$/i.test(tk[ci+1])) ci += 1;
+
     let si = -1;
     for(let k = ci + 4; k < Math.min(tk.length, ci + 13); k++){
       if(stop(k)) break;
@@ -660,7 +662,14 @@ function matchCourse(name){
 }
 
 function ingest(rows){
-  state.rows = rows; state.manual = {}; state.dup = {};
+  /* 판독 오류로 생긴 엉뚱한 연도를 걸러낸다.
+     한 사람의 재학 기간은 아무리 길어도 10년을 넘지 않는다. */
+  if(rows.length){
+    let maxY = 0;
+    rows.forEach(function(r){ if(r.year > maxY) maxY = r.year; });
+    rows = rows.filter(function(r){ return maxY - r.year <= 9; });
+  }
+  state.rows = rows; state.dup = {};
   state.done = {}; state.plan = {};
 
   /* 여름 · 겨울은 계절학기이므로 이수 학기 수와 학년 산정에서 뺀다.
@@ -686,7 +695,6 @@ function ingest(rows){
 
 /* 자동 대조 결과에 사용자가 지정한 대응을 덮어쓴다. */
 function mappedName(i){
-  if(state.manual[i] !== undefined) return state.manual[i] || null;
   const m = matchCourse(state.rows[i].name);
   return m.kind === 'exact' ? m.c.n : null;
 }
@@ -754,6 +762,23 @@ function passedTerm(c){
 }
 function selectable(c){ return visible(c) && !state.done[c.n] && !passedTerm(c); }
 
+/* 전공을 고르면 그 전공의 전공필수는 선택이 아니라 반드시 듣는 과목이다. */
+const MAJOR_LABEL = {arch:'건축학 (5년제)', eng:'건축공학 (4년제)', none:'학부 (전공 미배정)'};
+function required(c){
+  if(state.major !== 'arch' && state.major !== 'eng') return false;
+  if(c.req !== '전공필수') return false;
+  if(c.track === 'common') return !c.reqOf || c.reqOf === state.major;
+  return c.track === state.major;
+}
+/* 전공을 바꾸면 이전 전공 때문에 자동으로 담겼던 과목을 걷어내고 다시 채운다. */
+function syncRequired(){
+  Object.keys(state.auto).forEach(function(n){ delete state.plan[n]; });
+  state.auto = {};
+  COURSES.forEach(function(c){
+    if(required(c) && selectable(c)){ state.plan[c.n] = true; state.auto[c.n] = true; }
+  });
+}
+
 function compute(){
   let bBefore = 0, bAfter = 0, aAfter = 0, aBefore = [];
   const mustHit = [];
@@ -807,6 +832,7 @@ function compute(){
    5. 화면
    ============================================================ */
 function paint(){
+  syncRequired();
   const r = compute();
   const ready = state.rows.length;
 
@@ -921,12 +947,14 @@ function renderPath(){
 function courseRow(c){
   const d = state.done[c.n];
   const planned = !!state.plan[c.n];
+  const isReq = required(c) && !d;
   let cls = 'cw tr-' + c.track, st = '담기', lock = false;
   if(d){
     if(c.gr === '심화' && d.before){ cls += ' done warn'; st = '26-1 이전'; }
     else { cls += ' done'; st = '이수 ' + d.term; }
     lock = true;
   }else if(passedTerm(c)){ cls += ' locked'; st = '지난 학기'; lock = true; }
+  else if(isReq){ cls += ' planned req'; st = '전공필수'; lock = true; }
   else if(planned){ cls += ' planned'; st = '수강 예정'; }
   const marks = (c.star ? '<span class="mark">★</span>' : '') + (c.must ? '<span class="mark">◆</span>' : '');
   const meta = ['공통','건축학','건축공학'][{common:0,arch:1,eng:2}[c.track]] +
@@ -971,6 +999,15 @@ function renderImport(err){
     '<div><div class="k">GR심화 이수</div><div class="v">' + na + '</div></div>' +
     '</div>';
 
+  h += '<div class="field"><div class="fhead"><span class="fname">전공</span>' +
+       '<span class="fval">' + MAJOR_LABEL[state.major] + '</span></div><div class="chips">' +
+       ['none', 'arch', 'eng'].map(function(k){
+         return '<button type="button" class="chip plain' + (state.major === k ? ' on' : '') +
+                '" data-major="' + k + '">' +
+                {none:'학부', arch:'건축학 5년제', eng:'건축공학 4년제'}[k] + '</button>';
+       }).join('') +
+       '</div><p class="hint">전공을 고르면 그 전공의 전공필수 교과목이 이수 경로에 자동으로 포함됩니다. 학부는 전공 배정 전이므로 모든 과목을 직접 담습니다.</p></div>';
+
   h += '<div class="field"><div class="fhead"><span class="fname">이수 학기</span>' +
        '<span class="fval">' + (state.curNom !== null
          ? state.terms.length + '개 학기 이수 · ' + nomOf(state.curNom).y + '학년 ' + nomOf(state.curNom).t + '학기'
@@ -985,9 +1022,6 @@ function renderImport(err){
        (state.offset === null ? '' : '') + '</p></div>';
 
   /* 행별 인식 결과 확인 */
-  const opts = COURSES.map(function(c){
-    return '<option value="' + c.n + '" data-gr="' + c.gr + '">' + c.n + '</option>';
-  }).join('');
   const ndup = Object.keys(state.dup).length;
   h += '<details class="rest"' + (state.source === 'ocr' ? ' open' : '') + '>' +
        '<summary>인식한 과목 ' + state.rows.length + '개 확인 · 이수체계도 대응 ' + (nb + na) + '개' +
@@ -995,30 +1029,21 @@ function renderImport(err){
        '<div class="rowtab">';
   state.rows.forEach(function(r, i){
     const cur = mappedName(i);
-    const manual = state.manual[i] !== undefined && state.manual[i];
     const isDup = !!state.dup[i];
     h += '<div class="rrow' + (cur && !isDup ? ' on' : '') + (r.passed ? '' : ' fail') +
          (isDup ? ' dup' : '') + '">' +
          '<span class="rt">' + r.year + '-' + r.sem + '</span>' +
-         '<span class="rn">' + r.name + (manual ? '<em>직접 지정</em>' : '') +
+         '<span class="rn">' + r.name +
          (isDup ? '<em class="dupe">재수강 중복</em>' : '') + '</span>' +
-         '<span class="rc">' + (cur && byName(cur) ? byName(cur).cr : r.credit) + '</span>';
-    if(r.passed){
-      h += '<select class="rsel" data-row="' + i + '"><option value="">해당 없음</option>' + opts + '</select>';
-    }else{
-      h += '<span class="rx">미이수</span>';
-    }
-    h += '</div>';
+         '<span class="rc">' + (cur && byName(cur) ? byName(cur).cr : r.credit) + '</span>' +
+         '<span class="rx">' + (r.passed ? (cur && !isDup ? '특성화 교과목' : '') : '미이수') + '</span>' +
+         '</div>';
   });
-  h += '</div><p class="hint">학점은 이수체계도에 표기된 값으로 계산하므로 증명서 판독값과 다를 수 있습니다. 이수체계도의 교과목명과 완전히 같을 때만 자동으로 잡힙니다. 학번대가 달라 이름이 바뀐 과목이나 판독 오류는 오른쪽에서 직접 지정할 수 있습니다.' +
+  h += '</div><p class="hint">학점은 이수체계도에 표기된 값으로 계산하므로 증명서 판독값과 다를 수 있습니다. 이수체계도의 교과목명과 완전히 같을 때만 특성화 교과목으로 잡힙니다.' +
        (ndup ? ' 같은 과목이 여러 번 나오면 한 줄만 계산에 넣습니다. 이수한 줄을 우선하고, 둘 다 이수면 나중 학기를 씁니다.' : '') +
        '</p></details>';
 
   box.innerHTML = h;
-  state.rows.forEach(function(r, i){
-    const sel = box.querySelector('[data-row="' + i + '"]');
-    if(sel) sel.value = mappedName(i) || '';
-  });
 }
 
 /* ============================================================
@@ -1070,14 +1095,9 @@ function pick(name){
   state.plan[name] = !state.plan[name];
   paint();
 }
-document.addEventListener('change', function(e){
-  const ri = e.target.getAttribute ? e.target.getAttribute('data-row') : null;
-  if(ri === null || ri === undefined) return;
-  state.manual[+ri] = e.target.value;
-  rebuildDone(); inferOffset(); applySplit(); renderImport(null); paint();
-});
-
 document.addEventListener('click', function(e){
+  const mj = e.target.closest ? e.target.closest('[data-major]') : null;
+  if(mj){ state.major = mj.getAttribute('data-major'); renderImport(null); paint(); return; }
   const tb = e.target.closest ? e.target.closest('[data-tblock]') : null;
   if(tb){ const k = tb.getAttribute('data-tblock'); state.tOpen[k] = !state.tOpen[k]; renderPath(); return; }
   const pk = e.target.closest ? e.target.closest('[data-pick]') : null;
@@ -1090,9 +1110,9 @@ document.addEventListener('keydown', function(e){
 });
 
 document.getElementById('reset').addEventListener('click', function(){
-  state.rows = []; state.terms = []; state.maxRank = 0; state.tOpen = {};
+  state.rows = []; state.terms = []; state.maxRank = 0; state.tOpen = {}; state.major = 'none'; state.auto = {};
   state.offset = null; state.curNom = null; state.done = {}; state.plan = {};
-  state.source = null; state.manual = {}; state.dup = {};
+  state.source = null; state.dup = {};
   fileInput.value = '';
   document.getElementById('importResult').innerHTML = '';
   paint();
