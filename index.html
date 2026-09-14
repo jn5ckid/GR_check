@@ -46,29 +46,31 @@
   .gval{font-family:var(--mono);font-size:31px;font-weight:700;letter-spacing:-.03em;line-height:1.15;
         margin-top:2px;color:var(--ink-soft);}
   .gval .goal{font-size:17px;color:var(--ink-faint);font-weight:500;}
-  .bar{height:5px;background:#E4E4E0;border-radius:3px;margin-top:9px;overflow:hidden;display:flex;}
+  /* 24칸 — 한 칸이 1학점. 노랑은 GR기초, 초록은 GR심화, 연한 쪽은 수강 예정. */
+  .bar{display:flex;gap:2px;height:11px;margin-top:10px;}
+  .bar i{flex:1;background:#E2E2DE;border-radius:2px;}
+  .bar i.bd{background:var(--amber);}
+  .bar i.bp{background:#E0C894;}
+  .bar i.ad{background:var(--pine);}
+  .bar i.ap{background:#96C4B9;}
+  .gtop .gstage .k{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px;
+                   vertical-align:baseline;}
+  .gtop .gstage .k.b{background:var(--amber);}
+  .gtop .gstage .k.a{background:var(--pine);}
 
   .gauge.prog{border-color:var(--amber-line);background:var(--amber-wash);}
   .gauge.prog .gtop .glabel,.gauge.prog .gtop .gstage,.gauge.prog .gval{color:var(--amber);}
   .gauge.prog .gval .goal{color:#B99C63;}
-  .gauge.prog .bar{background:#F0E3C6;}
-  .gauge.prog .bar i.done{background:var(--amber);}
-  .gauge.prog .bar i.plan{background:#DCBE7C;}
   .gauge.prog .gsub{color:#96793E;}
   .gauge.prog .gsub b{color:var(--amber);}
 
   .gauge.met{border-color:var(--pine);background:var(--pine-wash);}
   .gauge.met .gtop .glabel,.gauge.met .gtop .gstage,.gauge.met .gval{color:var(--pine-dim);}
   .gauge.met .gval .goal{color:#7FA79E;}
-  .gauge.met .bar{background:#DCE9E5;}
-  .gauge.met .bar i.done{background:var(--pine);}
-  .gauge.met .bar i.plan{background:#9CC8BE;}
   .gauge.met .gsub{color:#6E8C85;}
   .gauge.met .gsub b{color:var(--pine-dim);}
   .bar{height:4px;background:var(--line-soft);border-radius:2px;margin-top:8px;overflow:hidden;display:flex;}
   .bar i{display:block;height:100%;width:0;transition:width .2s ease;}
-  .bar i.done{background:var(--ink-faint);}
-  .bar i.plan{background:#C6C6C0;}
   .gsub{display:flex;gap:15px;margin-top:9px;font-family:var(--mono);font-size:12px;color:var(--ink-faint);flex-wrap:wrap;}
   .gsub b{font-weight:700;color:var(--ink-soft);}
   .status.compact{padding:8px 0;}
@@ -290,9 +292,9 @@
 
   <div class="status">
     <div class="gauge" id="gauge">
-      <div class="gtop"><span class="glabel">교과 인정 학점</span><span class="gstage" id="gstage">GR기초 0 · GR심화 0</span></div>
+      <div class="gtop"><span class="glabel">교과 인정 학점</span><span class="gstage" id="gstage"></span></div>
       <div class="gval"><span id="gval">0</span><span class="goal"> / 24</span></div>
-      <div class="bar"><i class="done" id="barDone"></i><i class="plan" id="barPlan"></i></div>
+      <div class="bar" id="bar"></div>
       <div class="gsub">
         <span>이수 <b id="sDone">0</b></span>
         <span>수강 예정 <b id="sPlan">0</b></span>
@@ -426,7 +428,7 @@ const COURSES = [
 ];
 
 const TERMS = ['3-1','3-2','4-1','4-2'];
-const TERM_LABEL = {'3-1':'3학년 1학기','3-2':'3학년 2학기','4-1':'4학년 1학기','4-2':'4학년 2학기'};
+function termLabel(t){ const q = String(t).split('-'); return q[0] + '학년 ' + q[1] + '학기'; }
 
 /* 매칭 색인 */
 const NORM = function(s){
@@ -860,15 +862,27 @@ function compute(){
 /* ============================================================
    5. 화면
    ============================================================ */
+/* 24칸을 GR기초 이수 · 예정, GR심화 이수 · 예정 순으로 채운다. */
+function renderBar(r){
+  const seq = [['bd', r.basicDone], ['bp', r.basicPlan], ['ad', r.advDone], ['ap', r.advPlan]];
+  const cells = [];
+  seq.forEach(function(pair){
+    for(let i = 0; i < pair[1] && cells.length < 24; i++) cells.push(pair[0]);
+  });
+  while(cells.length < 24) cells.push('');
+  document.getElementById('bar').innerHTML =
+    cells.map(function(c){ return '<i class="' + c + '"></i>'; }).join('');
+}
+
 function paint(){
   syncRequired();
   const r = compute();
   const ready = state.rows.length;
 
   document.getElementById('gval').textContent = r.totalAll;
-  document.getElementById('gstage').textContent = 'GR기초 ' + r.basicAll + ' · GR심화 ' + r.advAll;
-  document.getElementById('barDone').style.width = Math.min(100, r.totalDone / 24 * 100) + '%';
-  document.getElementById('barPlan').style.width = Math.min(100 - r.totalDone / 24 * 100, (r.totalAll - r.totalDone) / 24 * 100) + '%';
+  document.getElementById('gstage').innerHTML =
+    '<i class="k b"></i>GR기초 ' + r.basicAll + ' · <i class="k a"></i>GR심화 ' + r.advAll;
+  renderBar(r);
   document.getElementById('sDone').textContent = r.totalDone;
   document.getElementById('sPlan').textContent = r.totalAll - r.totalDone;
   document.getElementById('sNeed').textContent = Math.max(0, 24 - r.totalAll);
@@ -953,17 +967,37 @@ function renderPath(){
   const el = document.getElementById('path');
   if(!state.rows.length){ el.innerHTML = '<p class="empty">보관성적증명서를 올리면 경로가 표시됩니다.</p>'; return; }
   let h = '';
+  /* 이미 들은 과목은 따로 묶는다 — 학년-학기 칸에는 남은 과목만 남긴다. */
+  const doneList = COURSES.filter(function(c){ return !!state.done[c.n]; })
+    .sort(function(a, b){ return nomIdx(a.term) - nomIdx(b.term); });
+  if(doneList.length){
+    let nb = 0, na = 0, drop = 0;
+    doneList.forEach(function(c){
+      if(c.gr === '기초') nb++;
+      else if(state.done[c.n].before) drop++;
+      else na++;
+    });
+    if(state.tOpen['DONE'] === undefined) state.tOpen['DONE'] = false;
+    h += '<div class="term-block' + (state.tOpen['DONE'] ? ' open' : '') + '">' +
+         '<button type="button" class="term-head" data-tblock="DONE">' +
+         '<span class="tarrow">▶</span><span class="tname">이수 완료</span>' +
+         '<span class="tmeta">GR기초 ' + nb + '과목 · GR심화 ' + na + '과목' +
+         (drop ? ' · 소급 제외 ' + drop + '과목' : '') + '</span></button>' +
+         '<div class="term-body">';
+    doneList.forEach(function(c){ h += courseRow(c); });
+    h += '</div></div>';
+  }
   TERMS.forEach(function(t){
-    const list = COURSES.filter(function(c){ return c.term === t && visible(c); });
+    const list = COURSES.filter(function(c){ return c.term === t && visible(c) && !state.done[c.n]; });
     if(!list.length) return;
     let sum = 0;
-    list.forEach(function(c){ if(state.done[c.n] || state.plan[c.n]) sum += crOf(c); });
+    list.forEach(function(c){ if(state.plan[c.n]) sum += crOf(c); });
     const pickable = list.filter(function(c){ return selectable(c); }).length;
     if(state.tOpen[t] === undefined) state.tOpen[t] = pickable > 0;
     h += '<div class="term-block' + (state.tOpen[t] ? ' open' : '') + '">' +
          '<button type="button" class="term-head" data-tblock="' + t + '">' +
-         '<span class="tarrow">▶</span><span class="tname">' + TERM_LABEL[t] + '</span>' +
-         '<span class="tmeta">' + (sum ? sum + '학점 · ' : '') +
+         '<span class="tarrow">▶</span><span class="tname">' + termLabel(t) + '</span>' +
+         '<span class="tmeta">' + (sum ? '담은 ' + sum + '학점 · ' : '') +
          (pickable ? '담을 수 있는 ' + pickable + '과목' : '남은 과목 없음') + '</span></button>' +
          '<div class="term-body">';
     list.forEach(function(c){ h += courseRow(c); });
@@ -988,7 +1022,8 @@ function courseRow(c){
   else if(isReq){ cls += ' planned req'; st = '전공필수'; lock = true; }
   else if(planned){ cls += ' planned'; st = '수강 예정'; }
   const marks = (c.star ? '<span class="mark">★</span>' : '') + (c.must ? '<span class="mark">◆</span>' : '');
-  const meta = ['공통','건축학','건축공학'][{common:0,arch:1,eng:2}[c.track]] +
+  const meta = (d ? termLabel(c.term) + ' · ' : '') +
+               ['공통','건축학','건축공학'][{common:0,arch:1,eng:2}[c.track]] +
                ' · ' + c.req + (c.reqOf ? '(' + (c.reqOf === 'arch' ? '건축학' : '건축공학') + ')' : '') +
                ' · GR' + c.gr + ' ' + crOf(c) + '학점' + (c.note ? ' · ' + c.note : '');
   return '<div class="' + cls + '"' + (lock ? '' : ' data-pick="' + c.n + '" role="button" tabindex="0"') + '>' +
