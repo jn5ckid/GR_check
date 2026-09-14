@@ -15,7 +15,7 @@
     --pine:#087263; --pine-dim:#065A4F; --pine-wash:#F0F6F4;
     --flag:#9A5B00; --flag-wash:#FBF5EC;
     --amber:#A8760B; --amber-wash:#FDF7EA; --amber-line:#E3CE9E;
-    --gray-wash:#F5F5F2;
+    --gray-wash:#F5F5F2; --lack:#B23B32;
     --arch:#A4413C; --common:#C07A28; --eng:#2E5E96; --field:#2F6B4F;
     --mono: ui-monospace,'SF Mono','Menlo','Consolas',monospace;
   }
@@ -91,6 +91,7 @@
   .verdict ul{margin:0;padding-left:17px;}
   .verdict li{font-size:13.5px;color:var(--ink-soft);margin-bottom:3px;line-height:1.55;}
   .verdict li b{color:var(--ink);font-weight:600;}
+  .verdict li .lack{font-style:normal;color:var(--lack);font-weight:700;}
   .verdict .note{font-size:13.5px;font-weight:700;color:var(--ink);margin:10px 0 0;padding-top:9px;border-top:1px solid var(--line);line-height:1.6;}
   .verdict.ok .note{border-top-color:#CBE0DA;color:var(--ink);}
   .verdict.no .note{border-top-color:#EFE3D2;color:var(--ink);}
@@ -241,6 +242,7 @@
   .cw.tr-field{border-left-color:var(--field);}
   .cw .cn{flex:1;font-size:14px;line-height:1.4;}
   .cw .cm{font-family:var(--mono);font-size:11px;color:var(--ink-faint);line-height:1.5;display:block;margin-top:1px;}
+  .cw .cm b{font-weight:700;color:var(--ink-soft);}
   .cw .cs{font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:5px;flex-shrink:0;
           background:#F4F4F1;color:var(--ink-faint);}
   .cw.done .cs{background:var(--amber);color:#fff;}
@@ -356,6 +358,7 @@
       <li>GR기초는 최대 9학점까지 인정되고 그중 소급분은 6학점까지만 들어갑니다.</li>
       <li>GR심화는 소급되지 않으므로 소급 대상 과목은 인정에서 빠집니다.</li>
       <li>2026학년도 2학기부터 이수한 과목은 그대로 인정됩니다.</li>
+      <li>선택한 전공의 전공필수 교과목은 이수 경로에 자동으로 담겨 아래 합계에 포함됩니다.</li>
     </ul>
     <div class="tally" id="tally"></div>
     <div class="routes" id="routes"></div>
@@ -919,10 +922,10 @@ function paint(){
       '</ul><p class="note">Silver 이상은 비교과 15크레딧이 추가로 필요합니다. 이 도구에서는 다루지 않습니다.</p>';
   }else{
     const gaps = [];
-    if(r.advAll < 15) gaps.push('GR심화 <b>' + (15 - r.advAll) + '학점</b> 부족');
-    if(r.totalAll < 24) gaps.push('합계 <b>' + (24 - r.totalAll) + '학점</b> 부족');
-    if(!r.mustHit.length) gaps.push('필수 교과목 미확보 — <b>「그린리모델링」 또는 「건축시스템설계」</b> 중 1과목');
-      if(r.basicWaste > 0) gaps.push('GR기초 <b>' + r.basicWaste + '학점</b>은 9학점 한도를 넘어 인정되지 않습니다');
+    if(r.advAll < 15) gaps.push('GR심화 <b>' + (15 - r.advAll) + '학점</b> <em class="lack">부족</em>');
+    if(r.totalAll < 24) gaps.push('합계 <b>' + (24 - r.totalAll) + '학점</b> <em class="lack">부족</em>');
+    if(!r.mustHit.length) gaps.push('필수 교과목 <em class="lack">미확보</em> — <b>「그린리모델링」 또는 「건축시스템설계」</b> 중 1과목');
+      if(r.basicWaste > 0) gaps.push('GR기초 <b>' + r.basicWaste + '학점</b>은 9학점 한도를 넘어 <em class="lack">인정되지 않습니다</em>');
     if(!r.feasible){
       v.className = 'verdict no';
       const why = [];
@@ -1038,7 +1041,7 @@ function courseRow(c){
   const meta = (d ? termLabel(c.term) + ' · ' : '') +
                ['공통','건축학','건축공학'][{common:0,arch:1,eng:2}[c.track]] +
                ' · ' + c.req + (c.reqOf ? '(' + (c.reqOf === 'arch' ? '건축학' : '건축공학') + ')' : '') +
-               ' · GR' + c.gr + ' ' + crOf(c) + '학점' + (c.note ? ' · ' + c.note : '');
+               ' · <b>GR' + c.gr + '</b> ' + crOf(c) + '학점' + (c.note ? ' · ' + c.note : '');
   return '<div class="' + cls + '"' + (lock ? '' : ' data-pick="' + c.n + '" role="button" tabindex="0"') + '>' +
          '<span class="cn">' + c.n + marks + '<span class="cm">' + meta + '</span></span>' +
          '<span class="cs">' + st + '</span></div>';
