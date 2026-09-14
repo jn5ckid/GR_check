@@ -211,13 +211,6 @@
   .trow .tv{font-family:var(--mono);font-size:14px;font-weight:600;flex-shrink:0;}
   .trow.sum{background:#F7F7F5;}
   .trow.dim .tk,.trow.dim .tv{color:var(--ink-faint);}
-  .routes{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;}
-  .route{border:1.3px solid var(--line);border-radius:8px;padding:10px 12px 12px;background:var(--gray-wash);}
-  .route.on{border:1.6px solid var(--ink);}
-  .route .rname{font-size:12.5px;font-weight:700;color:var(--ink-faint);}
-  .route.on .rname{color:var(--ink);}
-  .route .rbody{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:4px;line-height:1.6;}
-  .route.on .rbody{color:var(--ink-soft);}
 
   /* path */
   .term-block{margin-bottom:20px;}
@@ -289,8 +282,7 @@
 
   @media (max-width:470px){
     .summary{grid-template-columns:repeat(2,1fr);}
-    .routes{grid-template-columns:1fr;}
-  }
+    }
   @media (prefers-reduced-motion:reduce){*{transition:none !important;}}
 </style>
 </head>
@@ -362,7 +354,6 @@
       <li>선택한 전공의 전공필수 교과목은 이수 경로에 자동으로 담겨 아래 합계에 포함됩니다.</li>
     </ul>
     <div class="tally" id="tally"></div>
-    <div class="routes" id="routes"></div>
     <div class="gate" id="gateMust"></div>
   </section>
 
@@ -977,15 +968,8 @@ function renderTally(r){
   h += '<div class="trow sum"><span class="tk">인정 합계</span><span class="tv">' + r.totalAll + ' / 24</span></div>';
   el.innerHTML = h;
 
-  const need = Math.max(0, 24 - r.carry - r.advDone - r.bAfter);
-  const rr = document.getElementById('routes');
-  const slot = Math.max(0, 9 - r.carry - r.bAfter);
-  rr.innerHTML =
-    '<div class="route' + (r.basicPlan > 0 ? ' on' : '') + '"><div class="rname">GR기초 + GR심화</div>' +
-    '<div class="rbody">GR기초 ' + slot + '학점 + GR심화 ' + Math.max(0, need - slot) + '학점<br>남은 GR기초 슬롯을 쓰는 경로</div></div>' +
-    '<div class="route' + (r.basicPlan === 0 && r.advPlan > 0 ? ' on' : '') + '"><div class="rname">GR심화 단독</div>' +
-    '<div class="rbody">GR심화 ' + need + '학점<br>GR기초를 더 듣지 않는 경로</div></div>';
 }
+
 function row(k, sub, v){
   return '<div class="trow' + (v ? '' : ' dim') + '"><span class="tk">' + k +
          '<em>' + sub + '</em></span><span class="tv">' + v + '</span></div>';
